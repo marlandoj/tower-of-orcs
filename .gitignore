@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.vite/
+
+# Screenshots written by the in-game capture endpoint (dbg.save -> /__shot).
+# These are development review artifacts — 490 of them, ~28MB. The handful worth
+# keeping live in docs/screenshots/ and are committed deliberately.
+shots/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Build-progress dashboard — development record, not shipped.
+PROGRESS.json
+progress.html

@@ -1,0 +1,1075 @@
+/* =============================================================================
+   Tower of Orcs — UI theme. Imported by hud.css, which keeps only the FX-owned
+   damage-number rules so the two owners stop editing the same lines.
+
+   Look: carved wood, blackened iron, gilded edges, parchment type. Warm rather than
+   sci-fi, heavy rather than flat, and always legible over a chaotic 3D scene.
+
+   Three constraints shaped this file:
+   1. NO NETWORK. No @font-face, no Google Fonts, no image files. Fonts are a local
+      stack; every ornament is an inline SVG data URI. Offline, the UI is identical.
+   2. The middle of the screen belongs to the game. Everything is pinned to an edge.
+   3. Pointer events are off by default across the HUD and switched back on only for
+      things you actually click, so the overlay never swallows a shot.
+   ============================================================================= */
+
+:root {
+  /* --- palette --------------------------------------------------------- */
+  --ink: #07060a;
+  --wood-hi: #3a2a1b;
+  --wood: #221810;
+  --wood-lo: #0f0a07;
+  --iron: #14131a;
+  --gold: #d9a441;
+  --gold-hi: #ffe9ac;
+  --gold-dim: #8a6a2a;
+  --gold-deep: #5a4114;
+  --parchment: #efe3c6;
+  --parch-dim: #a5967a;
+  --blood: #c0261f;
+  --blood-hi: #ff5c46;
+  --rift: #5cd4ff;
+  --ember: #ff9a3a;
+  --good: #6fd06a;
+
+  /* Kept for compatibility with rules that predate the theme. */
+  --panel: rgba(14, 12, 16, 0.82);
+  --panel-edge: rgba(217, 164, 65, 0.35);
+
+  /* --- type ------------------------------------------------------------
+     Cinzel/Trajan if the machine happens to have them, then the Palatino family,
+     which ships on Windows (Palatino Linotype / Book Antiqua) and macOS and carries
+     the same carved-Roman feel. Georgia is the floor: still a serif, still on-brand. */
+  --font-display: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', 'Book Antiqua', Palatino,
+                  'URW Palladio L', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  /* Bahnschrift ships with Windows 10+, Avenir Next Condensed with macOS. Both are
+     condensed grotesques, which is what a dense HUD wants. */
+  --font-ui: 'Bahnschrift', 'DIN Alternate', 'Avenir Next Condensed', 'Roboto Condensed',
+             'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif;
+
+  /* --- ornament --------------------------------------------------------
+     A 40×40 gilded frame sliced at 16 so the corner flourishes stay crisp at any
+     panel size and only the thin edge line stretches. */
+  --frame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23d9a441' stroke-width='1.5' opacity='0.75'%3E%3Cpath d='M2 16V7a5 5 0 0 1 5-5h9'/%3E%3Cpath d='M24 2h9a5 5 0 0 1 5 5v9'/%3E%3Cpath d='M38 24v9a5 5 0 0 1-5 5h-9'/%3E%3Cpath d='M16 38H7a5 5 0 0 1-5-5v-9'/%3E%3Cpath d='M17 2h6M17 38h6M2 17v6M38 17v6'/%3E%3C/g%3E%3Cg fill='%23d9a441' opacity='0.9'%3E%3Cpath d='M7 4.4 9.6 7 7 9.6 4.4 7z'/%3E%3Cpath d='M33 4.4 35.6 7 33 9.6 30.4 7z'/%3E%3Cpath d='M33 30.4 35.6 33 33 35.6 30.4 33z'/%3E%3Cpath d='M7 30.4 9.6 33 7 35.6 4.4 33z'/%3E%3C/g%3E%3C/svg%3E");
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+
+  --shadow-drop: 0 8px 26px rgba(0, 0, 0, .62);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #05060a; }
+body {
+  font-family: var(--font-ui);
+  color: var(--parchment);
+  user-select: none; -webkit-user-select: none;
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeLegibility;
+}
+
+#app { position: fixed; inset: 0; }
+#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+#ui-root { position: absolute; inset: 0; pointer-events: none; }
+#ui-root > .overlay { pointer-events: auto; }
+.hidden { display: none !important; }
+.scroll-y { overflow-y: auto; overscroll-behavior: contain; }
+.scroll-y::-webkit-scrollbar { width: 8px; }
+.scroll-y::-webkit-scrollbar-track { background: rgba(0, 0, 0, .35); }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--gold-deep); border-radius: 4px; }
+
+/* ---------------------------------------------------------------- icons */
+.icon { width: 100%; height: 100%; display: block; }
+.icon .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .68; }
+.icon .d { fill: currentColor; opacity: .32; }
+.icon .a { fill: var(--acc, var(--gold)); }
+.icon .as { fill: none; stroke: var(--acc, var(--gold)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon .k { fill: #0b0806; opacity: .78; }
+.ico { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -.14em; }
+.ico.sm { width: .95em; height: .95em; }
+.sk { display: inline-block; width: 1em; height: 1em; vertical-align: -.13em; --acc: var(--parchment); }
+.sk.big { width: 1.6em; height: 1.6em; --acc: var(--gold-hi); }
+.divider { display: block; width: 240px; max-width: 60vw; height: 12px; color: var(--gold); margin: 0 auto; }
+
+/* ------------------------------------------------------------ primitives */
+/* A carved panel: end-grain gradient, a lit top edge, a gilded inner keyline and real
+   corner ornaments via border-image, so the flourishes never stretch. */
+.panel, .plaque, .sheet {
+  position: relative;
+  color: var(--parchment);
+  background:
+    linear-gradient(180deg, rgba(255, 218, 158, .07), rgba(255, 218, 158, 0) 42%),
+    repeating-linear-gradient(97deg, rgba(255, 255, 255, .019) 0 2px, rgba(0, 0, 0, 0) 2px 7px),
+    linear-gradient(180deg, #251a11 0%, #17100a 58%, #0c0805 100%);
+  border: 1px solid rgba(0, 0, 0, .9);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 214, 150, .18),
+    inset 0 -1px 0 rgba(0, 0, 0, .8),
+    inset 0 0 34px rgba(0, 0, 0, .55),
+    var(--shadow-drop);
+}
+.panel::before, .plaque::before, .sheet::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background-image: var(--grain);
+  opacity: .05; mix-blend-mode: overlay;
+}
+.panel::after, .plaque::after, .sheet::after {
+  content: ''; position: absolute; inset: 3px; pointer-events: none;
+  border: 11px solid transparent;
+  border-image: var(--frame) 16 / 11px / 0 stretch;
+  opacity: .85;
+}
+
+.plaque { padding: 7px 14px 8px; }
+.pl-label {
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  letter-spacing: 3px; color: var(--gold-dim); text-transform: uppercase;
+}
+
+/* ==========================================================================
+   HUD
+   ========================================================================== */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#hud * { pointer-events: none; }
+#hud button, #hud input, #hud .interactive { pointer-events: auto; }
+
+/* --- top row ------------------------------------------------------------- */
+.hud-top {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 12px; padding: 10px 14px;
+}
+.rift-plaque {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: 10px; min-width: 250px;
+}
+.rift-plaque .pl-label { color: var(--rift); text-shadow: 0 0 12px rgba(92, 212, 255, .5); }
+.rift-gauge {
+  position: relative; height: 15px; min-width: 110px; border-radius: 2px;
+  background: linear-gradient(180deg, #0b0a10, #16121a);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .24);
+  overflow: hidden;
+}
+.rift-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--fill, #5cd4ff) 70%, white 30%),
+    var(--fill, #5cd4ff) 45%,
+    color-mix(in srgb, var(--fill, #5cd4ff) 70%, black 30%));
+  box-shadow: 0 0 14px var(--fill, #5cd4ff);
+  transition: width .25s ease;
+}
+.rift-value {
+  font-family: var(--font-display); font-size: 21px; font-weight: 700;
+  min-width: 30px; text-align: right; color: var(--parchment);
+  text-shadow: 0 2px 0 #000;
+}
+.rift-plaque.critical { animation: alarm .8s ease-in-out infinite; }
+.rift-plaque.critical .rift-value { color: var(--blood-hi); }
+@keyframes alarm {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,214,150,.18), inset 0 0 34px rgba(0,0,0,.55), var(--shadow-drop); }
+  50% { box-shadow: inset 0 1px 0 rgba(255,214,150,.18), inset 0 0 30px rgba(180,20,10,.7), 0 0 26px rgba(200,30,20,.55); }
+}
+
+.wave-plaque { text-align: center; min-width: 186px; }
+.wave-label { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: 1.4px; }
+.wave-sub { font-size: 11px; letter-spacing: 3.4px; color: var(--gold-dim); text-transform: uppercase; margin-top: 1px; }
+.wave-sub.boss { color: var(--blood-hi); animation: alarm-text .8s infinite; }
+@keyframes alarm-text { 0%, 100% { opacity: .55; } 50% { opacity: 1; text-shadow: 0 0 14px var(--blood); } }
+.wave-pips { display: flex; gap: 3px; justify-content: center; margin-top: 5px; }
+.wave-pips .pip {
+  width: 12px; height: 4px; border-radius: 1px; background: rgba(217, 164, 65, .2);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .6);
+}
+.wave-pips .pip.done { background: var(--gold-dim); }
+.wave-pips .pip.now { background: var(--gold-hi); box-shadow: 0 0 8px var(--gold); }
+
+.score-plaque { text-align: right; min-width: 168px; }
+.coin-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; --acc: var(--gold); }
+.coin-row .ico { width: 17px; height: 17px; }
+.coin { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--gold-hi); text-shadow: 0 0 14px rgba(217, 164, 65, .45), 0 2px 0 #000; }
+.coin-row.bump { animation: coin-bump .34s cubic-bezier(.2, 1.5, .4, 1); }
+.coin-row.drop { animation: coin-drop .3s ease; }
+@keyframes coin-bump { 0% { transform: scale(1.24); filter: brightness(1.7); } 100% { transform: none; } }
+@keyframes coin-drop { 0% { transform: translateX(4px); filter: brightness(.55); } 100% { transform: none; } }
+.score-row { display: flex; align-items: baseline; justify-content: flex-end; gap: 7px; margin-top: 1px; }
+.score-label { font-size: 10px; letter-spacing: 2.6px; color: var(--gold-dim); }
+.score { font-size: 14px; color: var(--parch-dim); }
+
+/* --- left column: orcs left + threat intel ------------------------------- */
+/* The left rail is one fixed-height column holding the orc counter, the threat panel and
+   the toast stack, in that order. It is a *column* rather than three independently
+   anchored boxes because the two ways the rail used to break are both impossible inside
+   one: the panel cannot grow into the bottom dock (the rail's height is the dock's
+   complement) and the toast stack cannot grow up into the panel (it is `margin-top:auto`
+   inside the same column, and the panel shrinks against it). Both were measured
+   collisions — the first at 900x600 once the lane readout made the panel taller, the
+   second at 700x560 with four toasts up.
+   The rail's height is the one number that has to track the dock at every breakpoint. */
+.hud-left {
+  position: absolute; left: 12px; top: 96px;
+  width: min(296px, 22vw); display: flex; flex-direction: column; gap: 8px;
+  height: calc(100vh - 268px);
+}
+.hud-left .threat { flex: 0 1 auto; min-height: 0; }
+.remaining {
+  display: flex; align-items: baseline; gap: 8px; padding: 3px 4px;
+  font-family: var(--font-display);
+}
+.rem-n { font-size: 27px; font-weight: 700; color: var(--blood-hi); text-shadow: 0 0 18px rgba(192, 38, 31, .6), 0 2px 0 #000; }
+.rem-l { font-size: 11px; letter-spacing: 3px; color: var(--parch-dim); }
+
+.threat { padding: 9px 12px 10px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.th-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.th-title { font-family: var(--font-display); font-size: 12.5px; letter-spacing: 2.6px; color: var(--gold); }
+.th-head.boss .th-title { color: var(--blood-hi); }
+.th-count { font-size: 11px; letter-spacing: 1.6px; color: var(--parch-dim); }
+.th-flags { margin: 7px 0 4px; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; min-height: 0; }
+.th-flag {
+  display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start;
+  padding: 5px 7px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(192, 38, 31, .16), rgba(0, 0, 0, 0) 78%);
+  border-left: 2px solid var(--sev, var(--gold-dim));
+}
+.th-flag.sev-2 { --sev: var(--ember); }
+.th-flag.sev-3 { --sev: var(--blood); }
+.th-flag.sev-4 { --sev: var(--blood-hi); }
+.th-ico { width: 20px; height: 20px; --acc: var(--sev, var(--gold)); color: var(--parch-dim); margin-top: 1px; }
+.th-txt { display: block; min-width: 0; }
+.th-txt b { display: block; font-size: 12.5px; letter-spacing: .8px; color: var(--parchment); text-transform: uppercase; }
+.th-txt i { display: block; font-style: normal; font-size: 11.5px; line-height: 1.3; color: var(--parch-dim); }
+.th-none { margin: 7px 0; font-size: 11.5px; color: var(--parch-dim); font-style: italic; }
+.th-roster { border-top: 1px solid rgba(217, 164, 65, .18); padding-top: 5px; display: flex; flex-direction: column; gap: 1px; }
+.th-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 6px; align-items: baseline; font-size: 12.5px; }
+.th-n { color: var(--gold); font-weight: 700; text-align: right; }
+.th-n i { font-style: normal; opacity: .55; font-size: .85em; }
+.th-name { color: var(--parchment); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-tier { font-size: 8px; letter-spacing: -1px; color: var(--blood); }
+
+/* Which doors open. Sits directly under the wave title because it is the first thing
+   the build phase has to decide against — gates, not orc count, are the difficulty axis
+   and a defence is priced per corridor. */
+/* Flex-wrap rather than a three-column grid: on a narrow window the fixed `auto` column
+   pushed the lane pips clean out of the panel and into the play area. Wrapping puts them
+   on their own row instead, which is the correct answer at every width. */
+.th-lanes {
+  display: flex; flex-wrap: wrap; gap: 3px 7px; align-items: center;
+  margin-top: 7px; padding: 5px 7px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255, 106, 58, .18), rgba(0, 0, 0, 0) 82%);
+  border-left: 2px solid var(--ember);
+}
+.th-lanes.many { border-left-color: var(--blood-hi); background: linear-gradient(90deg, rgba(192, 38, 31, .24), rgba(0, 0, 0, 0) 82%); }
+.th-gate { flex: 0 0 18px; width: 18px; height: 18px; --acc: var(--ember); color: var(--parch-dim); }
+.th-lanes.many .th-gate { --acc: var(--blood-hi); }
+.th-lane-txt { flex: 1 1 auto; min-width: 0; font-size: 12.5px; letter-spacing: .6px; color: var(--parch-dim); }
+.th-lane-txt b { font-family: var(--font-display); font-size: 15px; color: var(--gold-hi); margin-right: 2px; }
+.lane-pips { flex: 0 1 auto; display: flex; gap: 3px; justify-content: flex-end; flex-wrap: wrap; margin-left: auto; }
+.lane-pip {
+  width: 7px; height: 11px; border-radius: 1px; background: rgba(217, 164, 65, .18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .6);
+}
+.lane-pip.on { background: var(--ember); box-shadow: 0 0 7px rgba(255, 154, 58, .8); }
+.th-lane-note { font-size: 11px; line-height: 1.3; color: var(--parch-dim); margin: 4px 0 0; font-style: italic; }
+
+/* Wave phase: the same panel, collapsed to a strip of ability icons. */
+.threat.mini { padding: 6px 8px 7px; }
+.threat.mini .th-count, .threat.mini .th-roster, .threat.mini .th-none, .threat.mini .th-txt i,
+.threat.mini .th-lane-note { display: none; }
+.threat.mini .th-lanes { margin-top: 5px; padding: 3px 6px; }
+.threat.mini .th-lane-txt { font-size: 11px; }
+.threat.mini .th-lane-txt b { font-size: 13px; }
+.threat.mini .th-flags { flex-direction: row; flex-wrap: wrap; gap: 4px; margin: 5px 0 0; overflow: visible; }
+.threat.mini .th-flag { padding: 3px 6px 3px 5px; align-items: center; grid-template-columns: 16px auto; gap: 5px; }
+.threat.mini .th-ico { width: 16px; height: 16px; margin: 0; }
+.threat.mini .th-txt b { font-size: 10.5px; letter-spacing: .6px; }
+/* Relabel without re-rendering: "INCOMING" is a build-phase word. */
+.threat.mini .th-title { font-size: 0; }
+.threat.mini .th-title::after { content: 'ON THE FIELD'; font-size: 12.5px; }
+
+/* --- right column: combo, combo feed, trap inspector ---------------------- */
+.hud-right {
+  position: absolute; right: 12px; top: 96px; width: min(238px, 24vw);
+  text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+/* Fades rather than slides: a slide-in from the right would briefly poke past the
+   viewport edge on a narrow window. */
+.combo { opacity: 0; transition: opacity .18s; }
+.combo.show { opacity: 1; }
+.combo-x {
+  display: block; font-family: var(--font-display); font-size: 48px; font-weight: 700;
+  line-height: .88; color: var(--c, var(--gold-hi));
+  text-shadow: 0 0 26px var(--c, var(--gold-hi)), 0 3px 0 #000, 0 6px 18px #000;
+}
+.combo-n { font-size: 12px; letter-spacing: 3.4px; color: var(--parch-dim); }
+.combo.pop .combo-x { animation: pop .28s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pop { 0% { transform: scale(1.45); } 100% { transform: scale(1); } }
+
+/* Trap-combo callouts. TRAPS teaches each of the six once with a toast; after that the
+   only feedback was a ring in the world, which nobody sees mid-fight. Stacked directly
+   under the multiplier so every "combo" idea in the game lives in one corner. */
+.combo-feed { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.cf-item {
+  display: inline-flex; align-items: baseline; gap: 7px; padding: 2px 8px; border-radius: 2px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(40, 26, 10, .92));
+  border-right: 2px solid var(--ember);
+  animation: cf-in .18s ease, cf-out .35s ease 1.25s forwards;
+}
+.cf-item b { font-family: var(--font-display); font-size: 12.5px; letter-spacing: 2px; color: #ffd98a; }
+.cf-item i { font-style: normal; font-size: 11.5px; color: var(--good); }
+/* Slides in from the *left*, even though it is pinned to the right edge: a rightward
+   entry transform would push a right-anchored box past the viewport for the length of
+   the animation, which is exactly the kind of thing that only shows up on a narrow
+   window. Moving toward the edge it is already flush with cannot overflow. */
+@keyframes cf-in { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes cf-out { to { opacity: 0; transform: translateX(-10px); } }
+
+/* --- placed-trap inspector ----------------------------------------------- */
+/* Traps have hp and three tiers now. This is what the cursor is hovering, and what a
+   click would do to it. Build mode only — it is furniture, and furniture hides. */
+.inspect {
+  width: 100%; text-align: left; padding: 7px 9px 8px; border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, rgba(38, 26, 16, .96), rgba(12, 9, 6, .94));
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .18), inset 0 0 0 1px rgba(217, 164, 65, .26), 0 6px 18px rgba(0, 0, 0, .6);
+  animation: cf-in .14s ease;
+}
+.ins-head { display: grid; grid-template-columns: 22px 1fr auto; gap: 7px; align-items: center; }
+.ins-icon { width: 22px; height: 22px; color: var(--parchment); }
+.ins-name { font-family: var(--font-display); font-size: 12.5px; letter-spacing: .5px; color: var(--gold-hi); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ins-pips { display: flex; gap: 2px; }
+.ins-pips .pip { width: 9px; height: 4px; border-radius: 1px; background: rgba(217, 164, 65, .2); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .7); }
+.ins-pips .pip.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); }
+.ins-hp {
+  position: relative; height: 11px; margin: 5px 0 4px; border-radius: 2px; overflow: hidden;
+  background: linear-gradient(180deg, #0b0a10, #17121a);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .22);
+}
+.ins-hp-fill { height: 100%; background: var(--fill, #6fd06a); transition: width .12s linear; }
+.ins-hp-txt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 9.5px; letter-spacing: .4px; text-shadow: 0 1px 2px #000; }
+.ins-acts { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--parch-dim); }
+.ins-act kbd { margin: 0 4px 0 0; font-size: .9em; }
+.ins-act.off { opacity: .45; }
+
+/* --- minimap -------------------------------------------------------------- */
+/* Anchored to the bottom-right corner, above the hint strip. The arena runs to 42x32
+   and the camera shows a fraction of it, so "where are the doors and where does the
+   horde walk" was a question with no answer short of walking the level. */
+.minimap {
+  position: absolute; right: 12px; bottom: 150px;
+  --mm-w: 176px; --mm-h: 132px;
+  padding: 5px 6px 4px; border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, rgba(30, 21, 13, .9), rgba(9, 7, 5, .9));
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .14), inset 0 0 0 1px rgba(217, 164, 65, .22), 0 6px 20px rgba(0, 0, 0, .6);
+}
+.mm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.mm-title { font-family: var(--font-display); font-size: 9.5px; letter-spacing: 2.4px; color: var(--gold-dim); }
+.mm-lanes { font-size: 10px; letter-spacing: .8px; color: var(--parch-dim); }
+.mm-lanes b { font-family: var(--font-display); font-size: 12.5px; color: var(--ember); }
+.mm-lanes.many b { color: var(--blood-hi); }
+.mm-lanes i { font-style: normal; opacity: .65; margin-right: 3px; }
+.mm-body { width: var(--mm-w); height: var(--mm-h); display: grid; place-items: center; }
+.mm-canvas { display: block; image-rendering: pixelated; }
+.mm-legend { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 8.5px; letter-spacing: .5px; color: #6f6455; }
+.mm-legend kbd { margin-left: auto; font-size: 8.5px; padding: 0 3px; opacity: .55; }
+.mk { width: 7px; height: 7px; border-radius: 1px; display: inline-block; }
+.mk + .mk { margin-left: 5px; }
+.mk.route { background: rgba(255, 150, 60, .85); }
+.mk.gate { background: #ff6a3a; }
+.mk.rift { background: var(--rift); border-radius: 50%; }
+
+/* --- bottom dock --------------------------------------------------------- */
+.hud-bottom {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: grid; grid-template-columns: 222px 1fr 200px; align-items: end;
+  gap: 12px; padding: 0 14px 12px;
+}
+.bot-left { min-width: 0; }
+.bot-mid { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.bot-right { min-width: 0; display: flex; justify-content: flex-end; }
+
+/* --- the hero's kit: weapons, vitals, spells ----------------------------- */
+.kit { display: flex; flex-direction: column; gap: 5px; }
+.weapons { display: flex; gap: 4px; }
+.wp {
+  position: relative; width: 44px; padding: 3px 2px 2px; border-radius: 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, #1e1610, #0c0806);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .1);
+  filter: grayscale(.6) brightness(.72);
+  transition: filter .14s, box-shadow .14s;
+}
+.wp.on {
+  filter: none;
+  background: linear-gradient(180deg, #402c10, #1d1206);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 170, .3), 0 0 0 1px var(--gold), 0 0 14px rgba(217, 164, 65, .3);
+}
+.wp.reloading { animation: wp-reload .7s linear infinite; }
+@keyframes wp-reload { 0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 214, 150, .1); } 50% { box-shadow: 0 0 0 1px var(--ember); } }
+.wp.dry { box-shadow: 0 0 0 1px var(--blood); }
+.wp-ico { width: 20px; height: 20px; color: var(--parchment); --acc: var(--gold); }
+.wp-fire { font-size: 7.5px; letter-spacing: 1px; color: #6f6455; }
+.wp-fire.semi { color: var(--ember); }
+.wp.on .wp-fire.semi { color: #ffb56a; }
+.wp-ammo { position: absolute; top: 1px; right: 3px; font-size: 9px; font-weight: 700; color: var(--gold); }
+.wp-ammo i { font-style: normal; opacity: .5; font-size: .82em; }
+.wp-mana { position: absolute; top: 1px; left: 3px; font-size: 8.5px; color: #6f8dff; }
+.wp-mana::before { content: '✦'; margin-right: 1px; opacity: .7; }
+
+.weapon-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.wp-hint { font-size: 9.5px; letter-spacing: 1.4px; color: var(--ember); white-space: nowrap; opacity: .8; }
+.wp-hint.nag { animation: nag .5s ease-in-out infinite; opacity: 1; }
+@keyframes nag { 0%, 100% { color: var(--ember); } 50% { color: #fff0c8; text-shadow: 0 0 10px var(--ember); } }
+
+.spells { display: flex; gap: 5px; }
+.sp {
+  position: relative; width: 34px; height: 34px; border-radius: 3px; overflow: hidden;
+  display: grid; place-items: center;
+  border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, #1c1620, #0a0810);
+  box-shadow: inset 0 1px 0 rgba(190, 200, 255, .12);
+  filter: grayscale(.55) brightness(.7);
+}
+.sp.ready { filter: none; box-shadow: inset 0 1px 0 rgba(200, 210, 255, .28), 0 0 0 1px rgba(140, 160, 255, .55), 0 0 12px rgba(110, 140, 255, .28); }
+/* A straight wipe from the bottom: at 34px a radial sweep is mush, and a straight edge
+   answers "how much longer" faster anyway. */
+.sp-cd { position: absolute; left: 0; right: 0; bottom: 0; height: var(--cd, 0%); background: rgba(6, 8, 20, .78); transition: height .1s linear; }
+.sp-ico { width: 20px; height: 20px; color: #cfd6ff; --acc: #9fb4ff; }
+.sp-key { position: absolute; bottom: 0; right: 2px; font-size: 8.5px; font-weight: 700; letter-spacing: .5px; color: var(--parch-dim); }
+.sp.ready .sp-key { color: #cfd6ff; }
+.emoji-ico { font-size: 16px; line-height: 1; display: block; }
+
+.vitals { display: flex; flex-direction: column; gap: 4px; }
+.vital {
+  position: relative; height: 18px; border-radius: 2px; overflow: hidden;
+  background: linear-gradient(180deg, #0b0a10, #17121a);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .24);
+}
+.vital.mana { height: 10px; }
+.vital.mana.dry { box-shadow: inset 0 2px 5px rgba(0, 0, 0, .9), inset 0 0 0 1px var(--blood); }
+.vital-text.sm { font-size: 8.5px; letter-spacing: .4px; color: #b9c4ff; }
+.vital-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--fill, #6fd06a) 72%, white 28%),
+    var(--fill, #6fd06a) 52%,
+    color-mix(in srgb, var(--fill, #6fd06a) 78%, black 22%));
+  transition: width .16s ease;
+}
+.vital.mana .vital-fill { --fill: #6f8dff; }
+.vital-text {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; letter-spacing: .6px; text-shadow: 0 1px 3px #000, 0 0 6px #000;
+}
+.weapon {
+  font-family: var(--font-display); font-size: 13px; letter-spacing: 1px;
+  color: var(--gold); text-shadow: 0 2px 6px #000;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.hint-strip { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: flex-end; align-content: flex-end; }
+.hint { font-size: 11px; color: var(--parch-dim); letter-spacing: .6px; white-space: nowrap; }
+.hint kbd { margin-right: 5px; margin-left: 0; }
+
+.phase-cta { display: flex; gap: 10px; align-items: center; justify-content: center; }
+
+/* --- trap bar ------------------------------------------------------------ */
+/* Slot width is set from JS to whatever fits the row: the roster grows from two traps on
+   level 1 to sixteen on level 10, and a hotbar that wraps or scrolls is a hotbar you stop
+   reading. Below 66px the slot goes icon-only and the tooltip carries the rest. */
+.trapbar { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; --slot: 84px; }
+.trap-slot {
+  position: relative; width: var(--slot); padding: 15px 3px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-family: var(--font-ui); color: var(--parchment); cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, .9); border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 218, 158, .08), rgba(255, 218, 158, 0) 46%),
+    linear-gradient(180deg, #251a11, #100b07);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .16), inset 0 -2px 6px rgba(0, 0, 0, .7), 0 4px 14px rgba(0, 0, 0, .55);
+  transition: transform .1s ease, box-shadow .15s, filter .15s;
+}
+.trap-slot::after {
+  content: ''; position: absolute; inset: 2px; border-radius: 3px; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(217, 164, 65, .22);
+}
+.trap-slot:hover, .trap-slot:focus-visible {
+  transform: translateY(-3px); outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .22), 0 8px 20px rgba(0, 0, 0, .6), 0 0 0 1px var(--gold);
+}
+.trap-slot.selected {
+  background: linear-gradient(180deg, #4a3312, #241705);
+  transform: translateY(-3px);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 170, .35), 0 0 22px rgba(217, 164, 65, .45), 0 0 0 1px var(--gold-hi);
+}
+.trap-slot.selected::after { box-shadow: inset 0 0 0 1px var(--gold-hi); }
+.trap-slot.poor { filter: grayscale(.75) brightness(.62); }
+.trap-slot.poor .ts-cost { color: var(--blood-hi); }
+.ts-key {
+  position: absolute; top: 2px; left: 4px; font-size: 10px; font-weight: 700;
+  color: var(--gold-dim); letter-spacing: .5px;
+}
+.ts-surface { position: absolute; top: 3px; right: 4px; width: 11px; height: 11px; opacity: .6; --acc: var(--parch-dim); }
+.ts-icon { width: 30px; height: 30px; color: var(--parchment); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .8)); }
+.ts-name {
+  font-size: 10px; line-height: 1.08; height: 22px; overflow: hidden;
+  text-align: center; letter-spacing: .2px; color: #d9cbac;
+}
+.ts-foot { display: flex; align-items: baseline; gap: 5px; }
+.ts-cost { font-size: 12px; font-weight: 700; color: var(--gold); }
+.ts-cost::before { content: '◈'; opacity: .55; margin-right: 2px; font-size: .85em; }
+.ts-cd { font-size: 9.5px; color: var(--parch-dim); opacity: .8; }
+.tier-badge {
+  position: absolute; bottom: 2px; right: 3px; font-style: normal; font-size: 9px;
+  font-weight: 700; color: #1a1206; background: var(--gold-hi); border-radius: 2px;
+  padding: 0 3px; letter-spacing: 0;
+}
+/* A capped resource whose cap is invisible is a bad resource — the Barricade allows
+   twelve and the guardians six, and before this the only way to find out was to be
+   refused a placement. Kept in every density including `micro`, unlike the cost. */
+.cap-badge {
+  position: absolute; bottom: 2px; left: 3px; font-style: normal; font-size: 9px;
+  font-weight: 700; letter-spacing: 0; color: var(--gold-hi);
+  background: rgba(8, 6, 4, .82); border-radius: 2px; padding: 0 3px;
+  box-shadow: inset 0 0 0 1px rgba(217, 164, 65, .4);
+}
+.cap-badge span { opacity: .55; font-weight: 400; }
+.cap-badge.full { color: #1a1206; background: var(--blood-hi); box-shadow: none; }
+.trap-slot.capped .ts-icon { opacity: .45; }
+
+.trapbar.compact .trap-slot { padding: 13px 2px 3px; }
+.trapbar.compact .ts-name, .trapbar.compact .ts-cd { display: none; }
+.trapbar.compact .ts-icon { width: 26px; height: 26px; }
+.trapbar.micro .trap-slot { padding: 11px 1px 3px; }
+.trapbar.micro .ts-foot, .trapbar.micro .ts-surface { display: none; }
+.trapbar.micro .ts-icon { width: 22px; height: 22px; }
+/* At sixteen-plus traps a slot is ~41px, which is narrower than a cap badge and a tier
+   badge side by side. The surface glyph is already gone at this density, so the tier
+   badge takes its corner and the cap badge gets the whole bottom edge. */
+.trapbar.micro .tier-badge { top: 2px; right: 2px; bottom: auto; }
+.trapbar.micro .cap-badge { left: 50%; transform: translateX(-50%); font-size: 8.5px; padding: 0 2px; }
+
+/* --- trap tooltip -------------------------------------------------------- */
+.trap-tip {
+  position: fixed; z-index: 40; width: 268px; padding: 10px 12px 11px;
+  border: 1px solid rgba(0, 0, 0, .9); border-radius: 4px;
+  background: linear-gradient(180deg, #26190f, #0d0906);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .2), inset 0 0 0 1px rgba(217, 164, 65, .28), 0 12px 32px rgba(0, 0, 0, .75);
+  pointer-events: none;
+}
+.tip-head { display: grid; grid-template-columns: 30px 1fr; gap: 9px; align-items: center; }
+.tip-icon { width: 30px; height: 30px; color: var(--parchment); }
+.tip-head b { display: block; font-family: var(--font-display); font-size: 14px; letter-spacing: .6px; color: var(--gold-hi); }
+.tip-head i { display: block; font-style: normal; font-size: 11px; letter-spacing: .8px; color: var(--parch-dim); text-transform: uppercase; }
+.tip-blurb { margin: 8px 0 6px; font-size: 12.5px; line-height: 1.34; color: #cfc0a1; }
+.tip-list { margin: 0; padding: 0 0 0 15px; font-size: 11.5px; line-height: 1.4; }
+.tip-list.good { color: var(--good); }
+.tip-list.bad { color: var(--ember); }
+.tip-cap { font-size: 11.5px; letter-spacing: .5px; color: var(--parch-dim); margin: 0 0 4px; }
+.tip-cap b { color: var(--gold-hi); }
+.tip-cap.full { color: var(--blood-hi); }
+.tip-cap.full b { color: var(--blood-hi); }
+.tip-up { font-size: 11px; color: var(--parch-dim); margin: 0 0 6px; opacity: .85; }
+
+/* --- tutorial ------------------------------------------------------------ */
+.tutorial {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  max-width: 560px; padding: 7px 12px;
+  border: 1px solid rgba(0, 0, 0, .9); border-radius: 4px;
+  background: linear-gradient(180deg, rgba(48, 33, 14, .96), rgba(14, 9, 5, .96));
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .22), 0 0 0 1px rgba(217, 164, 65, .35), 0 10px 28px rgba(0, 0, 0, .6);
+  animation: tut-in .26s ease;
+}
+@keyframes tut-in { from { opacity: 0; transform: translateY(10px); } }
+.tut-rail { display: flex; flex-direction: column; gap: 3px; }
+.tut-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(217, 164, 65, .25); }
+.tut-dot.done { background: var(--gold-dim); }
+.tut-dot.now { background: var(--gold-hi); box-shadow: 0 0 7px var(--gold); }
+.tut-title { font-family: var(--font-display); font-size: 13px; letter-spacing: 2px; color: var(--gold-hi); text-transform: uppercase; }
+.tut-text { font-size: 12.5px; line-height: 1.3; color: #d8cbaf; }
+.tut-skip {
+  font-family: var(--font-ui); font-size: 10px; letter-spacing: 1.6px; cursor: pointer;
+  color: var(--parch-dim); background: none; border: 1px solid rgba(217, 164, 65, .3);
+  border-radius: 2px; padding: 3px 7px;
+}
+.tut-skip:hover, .tut-skip:focus-visible { color: var(--gold-hi); border-color: var(--gold); outline: none; }
+
+/* --- toasts + banner ----------------------------------------------------- */
+/* Pinned to the bottom of the left rail rather than to the viewport: same place on
+   screen, but now it is the panel above it that yields when both want the space. */
+.toasts {
+  margin-top: auto; flex: 0 0 auto;
+  display: flex; flex-direction: column; gap: 5px; width: 100%;
+}
+.toast {
+  padding: 6px 11px; font-size: 13px; line-height: 1.28; color: #e2d6bb;
+  background: linear-gradient(90deg, rgba(20, 14, 9, .95), rgba(12, 8, 5, .82));
+  border-left: 3px solid var(--gold);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .55);
+  animation: slide-in .22s ease;
+}
+.toast-error { border-left-color: var(--blood); }
+.toast-info { border-left-color: var(--rift); }
+.toast-good { border-left-color: var(--good); }
+.toast.out { opacity: 0; transform: translateX(-20px); transition: .35s; }
+@keyframes slide-in { from { opacity: 0; transform: translateX(-22px); } }
+
+/* Deliberately in the upper third: a banner across the middle would sit exactly where
+   the fight is. */
+.banner { position: absolute; top: 12%; left: 0; right: 0; text-align: center; opacity: 0; pointer-events: none; }
+.banner.show { animation: banner 2.6s ease forwards; }
+@keyframes banner {
+  0% { opacity: 0; transform: scale(1.2); filter: blur(9px); }
+  12% { opacity: 1; transform: scale(1); filter: blur(0); }
+  74% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.03); }
+}
+.banner-title {
+  font-family: var(--font-display); font-size: clamp(30px, 4.4vw, 60px); font-weight: 700;
+  letter-spacing: 5px;
+  background: linear-gradient(180deg, #fff4d6 0%, #e9c069 42%, #a86a1c 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 0 #150c04) drop-shadow(0 8px 24px rgba(0, 0, 0, .9));
+}
+.banner-sub { font-size: clamp(11px, 1.2vw, 16px); letter-spacing: 5px; color: var(--gold); text-transform: uppercase; text-shadow: 0 2px 8px #000; }
+
+/* ==========================================================================
+   Overlays
+   ========================================================================== */
+.overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px; padding: 24px;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 42%, rgba(74, 40, 16, .55), rgba(0, 0, 0, 0) 72%),
+    radial-gradient(ellipse at center, rgba(16, 9, 6, .84), rgba(3, 3, 6, .97));
+  backdrop-filter: blur(5px);
+}
+.overlay::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: var(--grain); opacity: .045; mix-blend-mode: overlay;
+}
+/* A slow torch flicker so the menus feel lit rather than printed. */
+.overlay::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 45% at 50% 30%, rgba(255, 150, 60, .11), rgba(0, 0, 0, 0) 70%);
+  animation: torch 5.5s ease-in-out infinite;
+}
+@keyframes torch { 0%, 100% { opacity: .7; } 35% { opacity: 1; } 62% { opacity: .55; } }
+
+.sheet {
+  position: relative; z-index: 1; padding: 26px 30px 24px;
+  width: min(760px, 92vw); max-height: 90vh;
+  display: flex; flex-direction: column; gap: 16px; align-items: stretch;
+}
+.sheet.wide { width: min(1080px, 94vw); }
+.sheet.narrow { width: min(400px, 92vw); }
+.sheet-head { text-align: center; }
+.sheet-sub { margin: 6px 0 0; font-size: 13.5px; color: var(--parch-dim); line-height: 1.4; }
+.overlay h2, .ornate {
+  font-family: var(--font-display); font-size: clamp(24px, 3.2vw, 38px); font-weight: 700;
+  letter-spacing: 6px; margin: 0;
+  background: linear-gradient(180deg, #fff2d2, #dcae55 55%, #94631c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 #14100a) drop-shadow(0 6px 18px rgba(0, 0, 0, .8));
+}
+.overlay h2.win { background: linear-gradient(180deg, #fff6dd, #ffc861 55%, #b4741a); -webkit-background-clip: text; background-clip: text; }
+.overlay h2.lose { background: linear-gradient(180deg, #ffd6cf, #d8443a 55%, #6d1712); -webkit-background-clip: text; background-clip: text; }
+.overlay h3 { font-family: var(--font-display); font-size: 15px; letter-spacing: 2px; color: var(--gold); margin: 0 0 4px; }
+.empty { color: var(--parch-dim); font-style: italic; text-align: center; }
+
+/* --- buttons ------------------------------------------------------------- */
+.menu { display: flex; gap: 11px; flex-wrap: wrap; justify-content: center; }
+.menu.column { flex-direction: column; align-items: stretch; min-width: 264px; }
+.btn {
+  position: relative; font-family: var(--font-display); font-size: 15px; font-weight: 700;
+  letter-spacing: 2.4px; text-transform: uppercase; cursor: pointer;
+  padding: 11px 24px; color: var(--parchment); border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, #2c1f14 0%, #1a1209 55%, #0d0805 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .2), inset 0 -2px 6px rgba(0, 0, 0, .65), 0 5px 16px rgba(0, 0, 0, .55);
+  transition: transform .12s, box-shadow .16s, background .16s, color .16s;
+}
+.btn::after {
+  content: ''; position: absolute; inset: 2px; border-radius: 2px; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(217, 164, 65, .3);
+}
+.btn:hover, .btn:focus-visible {
+  color: var(--gold-hi); transform: translateY(-2px); outline: none;
+  background: linear-gradient(180deg, #4a3316, #26180a);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 170, .3), 0 8px 22px rgba(0, 0, 0, .6), 0 0 0 1px var(--gold);
+}
+.btn:active { transform: translateY(0); }
+.btn.primary {
+  background: linear-gradient(180deg, #a06a1c 0%, #6d4310 55%, #3d2408 100%);
+  color: #fff4dc;
+}
+.btn.primary:hover, .btn.primary:focus-visible {
+  background: linear-gradient(180deg, #d08b22, #8b5613);
+  box-shadow: inset 0 1px 0 rgba(255, 238, 190, .42), 0 8px 26px rgba(160, 90, 10, .45), 0 0 0 1px var(--gold-hi);
+}
+.btn.big { font-size: 19px; padding: 13px 32px; animation: breathe 2.2s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 238, 190, .34), 0 5px 16px rgba(0, 0, 0, .55); }
+  50% { box-shadow: inset 0 1px 0 rgba(255, 238, 190, .34), 0 0 28px rgba(217, 164, 65, .6), 0 5px 16px rgba(0, 0, 0, .55); }
+}
+.btn.tiny { font-size: 12px; padding: 5px 11px; letter-spacing: 1.4px; }
+.btn.ghost { background: rgba(12, 8, 5, .7); color: var(--parch-dim); }
+.btn.danger:hover, .btn.danger:focus-visible { color: #ffd9d3; box-shadow: inset 0 1px 0 rgba(255, 180, 170, .28), 0 0 0 1px var(--blood-hi), 0 8px 22px rgba(0, 0, 0, .6); }
+.btn.poor, .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+kbd {
+  font-family: var(--font-ui); font-size: .76em; letter-spacing: .5px;
+  border: 1px solid currentColor; border-radius: 3px; padding: 1px 5px;
+  opacity: .72; margin-left: 7px; vertical-align: .06em;
+}
+
+/* --- title --------------------------------------------------------------- */
+.screen-title { justify-content: center; gap: 24px; }
+.title-art { text-align: center; position: relative; z-index: 1; }
+.crest { width: clamp(76px, 9vw, 116px); height: clamp(76px, 9vw, 116px); margin: 0 auto 4px; display: block; filter: drop-shadow(0 6px 20px rgba(92, 212, 255, .32)); }
+.title-crest { animation: crest-glow 6s ease-in-out infinite; }
+@keyframes crest-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
+.title-art h1 {
+  font-family: var(--font-display); font-size: clamp(44px, 8.4vw, 108px); font-weight: 700;
+  letter-spacing: 8px; margin: 0; line-height: .96;
+  background: linear-gradient(180deg, #fff2cf 0%, #dda849 44%, #8a4a12 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 5px 0 #170d05) drop-shadow(0 14px 34px rgba(217, 90, 20, .45));
+}
+.title-art h1 span {
+  display: block; font-size: .3em; letter-spacing: 15px; color: #8a6a3a;
+  -webkit-text-fill-color: #8a6a3a; filter: none;
+}
+.filigree { margin: 14px 0 8px; }
+.tagline { color: var(--parch-dim); letter-spacing: 2px; font-size: clamp(12px, 1.3vw, 16px); margin: 0; }
+.credits {
+  position: absolute; bottom: 18px; left: 0; right: 0; text-align: center;
+  font-size: 12px; color: #6b6152; letter-spacing: 1.2px; padding: 0 16px;
+}
+
+/* --- level select -------------------------------------------------------- */
+.purse-line { margin-top: 7px; font-size: 13px; letter-spacing: 1.6px; color: var(--parch-dim); --acc: var(--gold); }
+.purse-line .sk { margin-right: 5px; --acc: var(--gold-hi); }
+.level-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 11px; padding: 2px; max-height: 62vh;
+}
+.level-card {
+  display: grid; grid-template-rows: auto 1fr auto; gap: 7px;
+  padding: 12px 12px 10px; text-align: left; cursor: pointer; color: var(--parchment);
+  border: 1px solid rgba(0, 0, 0, .9); border-radius: 4px;
+  background: linear-gradient(180deg, #241a11, #100b07);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .14), inset 0 0 0 1px rgba(217, 164, 65, .16), 0 5px 16px rgba(0, 0, 0, .5);
+  transition: transform .13s, box-shadow .16s;
+}
+.level-card:hover:not(.locked), .level-card:focus-visible:not(.locked) {
+  transform: translateY(-3px); outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 230, 170, .24), 0 10px 24px rgba(0, 0, 0, .6), 0 0 0 1px var(--gold);
+}
+.level-card.locked { opacity: .42; cursor: not-allowed; filter: grayscale(.6); }
+.lv-medal {
+  width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #ffe1a2, #b07a1e 62%, #4d3009);
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .5), 0 2px 8px rgba(0, 0, 0, .6);
+}
+.lv-medal span { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: #2a1a06; }
+.lv-name { font-family: var(--font-display); font-size: 15px; letter-spacing: .6px; color: var(--gold-hi); }
+.lv-sub { font-size: 12px; color: var(--parch-dim); line-height: 1.25; margin-top: 2px; }
+.lv-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; border-top: 1px solid rgba(217, 164, 65, .16); padding-top: 6px; }
+.lv-skulls { display: flex; gap: 2px; }
+.lv-best { font-size: 11.5px; color: var(--gold); }
+.lv-lock { width: 15px; height: 15px; --acc: var(--parch-dim); }
+.lv-locktext { font-size: 10.5px; letter-spacing: 2px; color: var(--parch-dim); }
+.skull { display: inline-block; width: 17px; height: 17px; --acc: #3a3128; }
+.skull.lit { --acc: var(--gold-hi); filter: drop-shadow(0 0 6px rgba(217, 164, 65, .6)); }
+
+/* --- how to play --------------------------------------------------------- */
+.howto-body { max-width: 640px; font-size: 14.5px; line-height: 1.55; color: #cdbfa3; max-height: 58vh; }
+.howto-body section { margin-bottom: 14px; }
+.howto-body p { margin: 0; }
+.howto-body kbd { color: var(--gold); }
+
+/* --- settings ------------------------------------------------------------ */
+.settings-sheet .set-list { display: flex; flex-direction: column; gap: 12px; }
+.set-row { display: grid; grid-template-columns: 1fr 220px; gap: 16px; align-items: center; }
+.set-label { font-size: 14.5px; letter-spacing: .8px; color: #ddd0b3; }
+.set-hint { display: block; font-size: 11.5px; color: var(--parch-dim); letter-spacing: 0; }
+.set-slider { display: grid; grid-template-columns: 1fr 44px; gap: 10px; align-items: center; }
+.set-slider output { font-size: 12.5px; color: var(--gold); text-align: right; }
+input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 7px; border-radius: 2px;
+  background: linear-gradient(180deg, #0b0a10, #1a1420);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .26);
+}
+input[type=range]::-moz-range-track {
+  height: 7px; border-radius: 2px; background: #14101a;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .26);
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; margin-top: -5px;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #ffe4ab, #b8801f 62%, #4d3009);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+}
+input[type=range]::-moz-range-thumb {
+  width: 17px; height: 17px; border: none; border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #ffe4ab, #b8801f 62%, #4d3009);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+}
+input[type=range]:focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; }
+.toggle {
+  width: 52px; height: 24px; border-radius: 13px; cursor: pointer; position: relative;
+  border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, #16101a, #0b080d);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .22);
+  transition: background .16s;
+}
+.toggle .knob {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #cfc2a6, #5f574a);
+  transition: transform .16s ease, background .16s;
+}
+.toggle.on { background: linear-gradient(180deg, #7a5314, #40290a); }
+.toggle.on .knob { transform: translateX(28px); background: radial-gradient(circle at 36% 30%, #ffe4ab, #b8801f); }
+.toggle:focus-visible { outline: none; box-shadow: inset 0 1px 4px rgba(0, 0, 0, .9), 0 0 0 1px var(--gold); }
+
+/* --- spellbook ----------------------------------------------------------- */
+.sb-purse {
+  display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(60, 42, 14, .55), rgba(0, 0, 0, 0));
+}
+.sb-count { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold-hi); }
+.sb-of { font-size: 12.5px; color: var(--parch-dim); letter-spacing: 1px; }
+.sb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 9px; max-height: 52vh; padding: 2px; }
+.sb-card {
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 11px; align-items: center;
+  padding: 9px 11px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, #221810, #100b07);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .12), inset 0 0 0 1px rgba(217, 164, 65, .14);
+}
+.sb-card.owned { box-shadow: inset 0 1px 0 rgba(255, 230, 170, .2), inset 0 0 0 1px rgba(217, 164, 65, .4), 0 0 16px rgba(217, 164, 65, .12); }
+.sb-card.locked { opacity: .4; filter: grayscale(.7); }
+.sb-icon { width: 40px; height: 40px; color: var(--parchment); }
+.sb-name { font-family: var(--font-display); font-size: 14px; color: var(--gold-hi); letter-spacing: .5px; }
+.sb-meta { font-size: 11.5px; color: var(--parch-dim); letter-spacing: .4px; }
+.sb-meta b { color: var(--gold); }
+.sb-pips { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.sb-pips .pip {
+  width: 16px; height: 5px; border-radius: 1px; background: rgba(217, 164, 65, .18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .7);
+}
+.sb-pips .pip.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); box-shadow: 0 0 7px rgba(217, 164, 65, .6); }
+.sb-tier { font-size: 11px; color: var(--parch-dim); margin-left: 5px; }
+.sb-buy { min-width: 70px; text-align: center; }
+.sb-buy .sk { --acc: var(--gold-hi); }
+.sb-buy.maxed, .sb-buy.locked-note { font-size: 10.5px; letter-spacing: 1.4px; color: var(--parch-dim); }
+.sb-buy.maxed { color: var(--gold); }
+
+/* --- armoury (the shop facade) ------------------------------------------ */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 9px; max-height: 60vh; padding: 2px; }
+.shop-card {
+  display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: start;
+  padding: 11px 12px; text-align: left; cursor: pointer; color: var(--parchment);
+  border: 1px solid rgba(0, 0, 0, .9); border-radius: 4px;
+  background: linear-gradient(180deg, #241a11, #100b07);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .13), inset 0 0 0 1px rgba(217, 164, 65, .14);
+  transition: transform .12s, box-shadow .16s;
+}
+.shop-card:hover, .shop-card:focus-visible { transform: translateY(-2px); outline: none; box-shadow: inset 0 1px 0 rgba(255, 230, 170, .24), 0 0 0 1px var(--gold), 0 8px 20px rgba(0, 0, 0, .55); }
+.shop-card.poor { filter: grayscale(.6) brightness(.7); }
+.shop-icon { width: 42px; height: 42px; color: var(--parchment); }
+.shop-name { font-family: var(--font-display); font-size: 15px; color: var(--gold-hi); letter-spacing: .5px; }
+.shop-name .tier-badge { position: static; margin-left: 6px; }
+.shop-meta { font-size: 11.5px; color: var(--parch-dim); letter-spacing: .5px; margin: 1px 0 4px; --acc: var(--gold-dim); }
+.shop-blurb { font-size: 12.5px; line-height: 1.34; color: #c9bb9e; }
+.shop-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag { font-size: 10.5px; letter-spacing: .6px; padding: 1px 6px; border-radius: 2px; border: 1px solid currentColor; }
+.tag.good { color: var(--good); }
+.tag.bad { color: var(--ember); }
+.shop-cost { font-family: var(--font-display); font-size: 17px; color: var(--gold); white-space: nowrap; --acc: var(--gold); }
+.shop-cost.poor { color: var(--blood-hi); }
+.shop-cost .ico { margin-right: 4px; }
+
+/* --- results ------------------------------------------------------------- */
+.results-sheet { align-items: center; text-align: center; }
+.res-level { font-size: 13px; letter-spacing: 3px; color: var(--parch-dim); text-transform: uppercase; margin-top: 6px; }
+.skull-row { display: flex; gap: 9px; justify-content: center; }
+.skull-row .skull { width: 40px; height: 40px; }
+.skull-row .skull.lit { animation: skull-in .45s cubic-bezier(.2, 1.5, .4, 1) backwards; }
+.skull-row .skull.lit:nth-child(2) { animation-delay: .1s; }
+.skull-row .skull.lit:nth-child(3) { animation-delay: .2s; }
+.skull-row .skull.lit:nth-child(4) { animation-delay: .3s; }
+.skull-row .skull.lit:nth-child(5) { animation-delay: .4s; }
+@keyframes skull-in { from { transform: scale(2.2) rotate(-12deg); opacity: 0; } }
+
+/* The verdict line. This is the sentence the screen exists to say: the rating is a
+   minimum over three axes, so it always has a named weakest one, and naming it is the
+   entire replay hook. It is bigger than the stats because it matters more than they do. */
+.res-verdict {
+  font-size: 15px; letter-spacing: 1px; color: var(--parch-dim); max-width: 560px;
+  line-height: 1.45;
+}
+.res-verdict b {
+  font-family: var(--font-display); font-size: 19px; letter-spacing: 3px; color: var(--ember);
+  text-shadow: 0 0 16px rgba(255, 154, 58, .5);
+}
+.res-verdict i { display: block; font-style: normal; font-size: 12.5px; color: #9a8d76; margin-top: 2px; }
+.res-verdict.lose { color: #d8a49c; }
+.res-verdict.perfect { color: var(--gold-hi); }
+
+/* Three axis meters. All three fill rightward for "better", including TIME, whose raw
+   ratio is lower-is-better — a row where one meter means the opposite of the other two
+   cannot be read at a glance, and glanceability is the whole product. The raw figure is
+   printed underneath so nothing is hidden by the inversion. */
+.ax-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  width: min(620px, 92vw);
+}
+.ax { text-align: left; opacity: .78; transition: opacity .2s; }
+.ax.limiter { opacity: 1; }
+.ax-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ax-name { font-family: var(--font-display); font-size: 12px; letter-spacing: 3px; color: var(--parch-dim); }
+.ax.limiter .ax-name { color: var(--ember); text-shadow: 0 0 12px rgba(255, 154, 58, .45); }
+.ax-tier { display: flex; gap: 1px; }
+.ax-tier .skull { width: 11px; height: 11px; }
+.ax-track {
+  position: relative; height: 12px; margin: 5px 0 4px; border-radius: 2px; overflow: hidden;
+  background: linear-gradient(180deg, #0b0a10, #17121a);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(217, 164, 65, .24);
+}
+.ax-fill { height: 100%; background: linear-gradient(90deg, #6b4410, #c99038); }
+.ax.limiter .ax-fill { background: linear-gradient(90deg, #8a3a12, #ff9a3a); box-shadow: 0 0 14px rgba(255, 154, 58, .5); }
+/* The skull thresholds, drawn on the track from SKULL_AXES rather than a copy of it.
+   A meter without its thresholds says where you are but not what better would cost. */
+.ax-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(239, 227, 198, .3); }
+.ax-tick.passed { background: rgba(255, 233, 172, .75); }
+.ax-tick::after {
+  content: attr(data-n); position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  font-size: 7.5px; color: #6f6455; line-height: 1.6;
+}
+.ax-legend { display: flex; flex-direction: column; margin-top: 9px; }
+.ax-legend b { font-family: var(--font-display); font-size: 15px; color: var(--gold-hi); }
+.ax-legend b span { font-family: var(--font-ui); font-size: 11px; color: var(--parch-dim); margin-left: 3px; }
+.ax-legend i { font-style: normal; font-size: 10.5px; letter-spacing: .6px; color: #6f6455; }
+
+/* --- skill tree ---------------------------------------------------------- */
+.sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 9px; max-height: 54vh; padding: 2px; }
+.sk-card {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 11px; align-items: center;
+  padding: 9px 11px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .9);
+  background: linear-gradient(180deg, #221810, #100b07);
+  box-shadow: inset 0 1px 0 rgba(255, 214, 150, .12), inset 0 0 0 1px rgba(217, 164, 65, .14);
+  text-align: left;
+}
+.sk-card.owned { box-shadow: inset 0 1px 0 rgba(255, 230, 170, .2), inset 0 0 0 1px rgba(217, 164, 65, .4), 0 0 16px rgba(217, 164, 65, .12); }
+.sk-ico { font-size: 24px; line-height: 1; text-align: center; }
+.sk-name { font-family: var(--font-display); font-size: 14px; color: var(--gold-hi); letter-spacing: .5px; }
+.sk-blurb { font-size: 11.5px; line-height: 1.32; color: var(--parch-dim); margin-top: 1px; }
+.sk-pips { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+.sk-pips .pip { width: 20px; height: 5px; border-radius: 1px; background: rgba(217, 164, 65, .18); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .7); }
+.sk-pips .pip.on { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); box-shadow: 0 0 7px rgba(217, 164, 65, .6); }
+.sk-rank { font-size: 10.5px; color: var(--parch-dim); margin-left: 4px; }
+.sk-buy { min-width: 74px; text-align: center; }
+.sk-buy.maxed { font-size: 10.5px; letter-spacing: 1.4px; color: var(--gold); }
+
+.res-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 2px 22px; width: min(560px, 88vw); }
+.res-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 2px; border-bottom: 1px solid rgba(217, 164, 65, .14); font-size: 14px; }
+.res-stat span { color: var(--parch-dim); }
+.res-stat b { font-family: var(--font-display); color: var(--gold-hi); font-size: 15px; }
+.res-stat b i { font-style: normal; font-size: .8em; color: var(--parch-dim); }
+.res-stat.good b { color: var(--good); }
+.res-stat.bad b { color: var(--blood-hi); }
+
+/* ==========================================================================
+   Responsive — the HUD must never crowd the play area on a small window.
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .hud-bottom { grid-template-columns: 200px 1fr 150px; }
+  .rift-plaque { min-width: 200px; }
+  .score-plaque { min-width: 140px; }
+  .wave-plaque { min-width: 150px; }
+  .minimap { --mm-w: 150px; --mm-h: 114px; }
+  .ax-grid { gap: 12px; }
+}
+@media (max-width: 960px) {
+  .hud-top { padding: 8px 10px; gap: 8px; }
+  .plaque { padding: 5px 10px 6px; }
+  .hud-bottom { grid-template-columns: 190px 1fr 0; padding: 0 10px 10px; gap: 8px; }
+  .bot-right { display: none; }
+  .hud-left { top: 84px; left: 10px; width: min(240px, 21vw); height: calc(100vh - 246px); }
+  .hud-right { top: 84px; right: 10px; width: min(190px, 30vw); }
+  .wave-plaque .wave-pips { display: none; }
+  .rift-plaque { min-width: 168px; }
+  .set-row { grid-template-columns: 1fr 160px; }
+  .tutorial { max-width: 92vw; }
+  /* The map is the largest single piece of furniture; on a narrow window it shrinks
+     rather than crowding the corridor, and M still turns it off entirely. */
+  .minimap { --mm-w: 116px; --mm-h: 92px; bottom: 128px; right: 10px; }
+  .mm-legend { display: none; }
+  .ax-grid { grid-template-columns: 1fr; gap: 8px; width: min(400px, 92vw); }
+  .ax-legend { flex-direction: row; align-items: baseline; gap: 8px; margin-top: 4px; }
+}
+/* Narrower still: the kit strip and the map are the first things to go, in that order,
+   because the trap bar and the rift gauge are the two things you cannot play without. */
+@media (max-width: 760px) {
+  .minimap { display: none; }
+  .hud-bottom { grid-template-columns: 150px 1fr 0; }
+  .weapons .wp { width: 34px; }
+  .wp-ico { width: 16px; height: 16px; }
+  .sp { width: 28px; height: 28px; }
+  .hud-right { width: min(150px, 40vw); }
+  .inspect { font-size: .92em; }
+}
+@media (max-height: 760px) {
+  .hud-left { height: calc(100vh - 250px); }
+  .combo-x { font-size: 38px; }
+  .sheet { padding: 18px 22px 16px; gap: 12px; }
+  .skull-row .skull { width: 32px; height: 32px; }
+  .minimap { --mm-h: 104px; bottom: 140px; }
+  .res-verdict { font-size: 13.5px; }
+  .res-verdict b { font-size: 17px; }
+}
+@media (max-height: 620px) {
+  .minimap { --mm-w: 132px; --mm-h: 96px; bottom: 124px; }
+  .sk-grid, .sb-grid, .shop-grid, .level-grid { max-height: 44vh; }
+  .ax-track { height: 9px; }
+}
+/* The title screen is the tallest stack in the game (crest + wordmark + five buttons +
+   credits). Compress it rather than let it run off a short window. */
+@media (max-height: 640px) {
+  .screen-title { gap: 10px; }
+  .crest { width: 52px; height: 52px; margin-bottom: 0; }
+  .title-art h1 { font-size: clamp(28px, 6.4vw, 54px); letter-spacing: 5px; }
+  .filigree { margin: 6px 0 3px; }
+  .filigree .divider { height: 9px; }
+  .tagline { font-size: 11.5px; letter-spacing: 1.4px; }
+  .menu.column { min-width: 216px; gap: 6px; }
+  .menu.column .btn { padding: 7px 16px; font-size: 13px; letter-spacing: 2px; }
+  .credits { font-size: 10.5px; bottom: 6px; }
+}
+
+/* Short windows: the build-phase furniture is what grows the bottom dock, so shrink
+   that rather than let it climb into the corridor. */
+@media (max-height: 660px) {
+  /* The dock is shorter here, so the rail may be taller. Written after the 760px-height
+     rule above on purpose: that one assumes the taller dock. */
+  .hud-left { height: calc(100vh - 230px); }
+  .bot-mid { gap: 5px; }
+  .kit { gap: 3px; }
+  .tutorial { padding: 5px 10px; gap: 9px; }
+  .tut-text { font-size: 11.5px; }
+  .btn.big { font-size: 16px; padding: 9px 22px; }
+  .vitals .vital { height: 15px; }
+  .vitals .vital.mana { height: 8px; }
+  .weapons .wp { width: 38px; padding: 2px 2px 1px; }
+  .sp { width: 28px; height: 28px; }
+  .sp-ico { width: 16px; height: 16px; }
+  .banner { top: 9%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

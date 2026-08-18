@@ -1,0 +1,27 @@
+/* Tower of Orcs — stylesheet entry point.
+ *
+ * Everything that makes the UI look like a game lives in theme.css (owned by UI).
+ * This file keeps only the FX-owned damage-number and flash rules, so the two owners
+ * never edit the same lines. Import first, so FX rules below always win a tie.
+ *
+ * No network imports anywhere: the type is a local font stack and every ornament is an
+ * inline SVG data URI. See theme.css.
+ */
+@import './theme.css';
+
+/* damage numbers + flash (owned by FX) */
+.fx-numbers { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.dmg { position: absolute; top: 0; left: 0; font-family: var(--font-display); font-weight: 900; font-size: 19px; color: #fff; text-shadow: 0 2px 0 #000, 0 0 10px rgba(0,0,0,.9); will-change: transform, opacity; }
+.dmg-crit { font-size: 30px; color: #ffdf50; text-shadow: 0 2px 0 #000, 0 0 18px #ff8a20; }
+.dmg-fire { color: #ff9a3a; } .dmg-ice { color: #8fe0ff; } .dmg-poison { color: #9aff6a; }
+.dmg-lightning { color: #b0d8ff; } .dmg-arcane { color: #d0a0ff; } .dmg-crush { color: #ffd0a0; }
+.dmg-immune { font-size: 15px; color: #8a92a0; letter-spacing: 1px; }
+/* Payout + combo callouts, and the tier ramp that makes a 5x number twice the 1x one. */
+.dmg-coin { font-size: 22px; color: #ffd24a; text-shadow: 0 2px 0 #000, 0 0 14px rgba(255,170,40,.95); }
+.dmg-combo { font-size: 34px; color: #ffe27a; letter-spacing: 2px; text-shadow: 0 3px 0 #000, 0 0 26px #ff9420, 0 0 60px rgba(255,120,20,.7); }
+.dmg-t1 { font-size: 23px; }
+.dmg-t2 { font-size: 27px; color: #ffe9a8; text-shadow: 0 2px 0 #000, 0 0 14px rgba(255,170,50,.8); }
+.dmg-t3 { font-size: 32px; color: #ffd86a; text-shadow: 0 2px 0 #000, 0 0 20px rgba(255,140,30,.95); }
+.dmg-t4 { font-size: 38px; color: #ffc23a; text-shadow: 0 3px 0 #000, 0 0 26px #ff8a10, 0 0 56px rgba(255,90,0,.8); }
+.dmg-combo.dmg-t4 { font-size: 46px; }
+.fx-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: screen; }
