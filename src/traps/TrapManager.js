@@ -82,6 +82,17 @@ export class TrapManager {
     this._camQ = new THREE.Quaternion();
 
     game.bus.on('level:load', ({ level }) => this._onLevelLoad(level));
+
+    // Starting a wave is a mode change: the player pressed ENTER to *fight*, not to carry
+    // on building. Leaving build mode latched meant that once you had clicked anything in
+    // the trap bar, every left-click for the rest of the wave placed a trap and the weapon
+    // never fired at all — `Player.update` gates firing on `!traps.buildMode`. The only way
+    // out was a Tab press the game never tells you about, so the reasonable read was that
+    // the game had locked you into placing traps.
+    //
+    // Building *during* a wave is still supported and is a real tactic; it just is not the
+    // default any more. Tab (or picking a trap) puts you back in build mode mid-wave.
+    game.bus.on('wave:start', () => { if (this.buildMode) this.toggleBuild(false); });
   }
 
   _onLevelLoad() {
