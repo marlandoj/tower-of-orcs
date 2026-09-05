@@ -43,6 +43,7 @@ export class Player {
     this.velocity = new THREE.Vector3();
     this.aimPoint = new THREE.Vector3();
     this.facing = 0;
+    this.viewHeading = 0;
     this.aimAngle = 0;
 
     // --- damage model (mirrors the Enemy contract so applyDamage() works on us) ---
@@ -151,6 +152,10 @@ export class Player {
     this.position.y = 0;
     this.object.position.copy(this.position);
     this.game.rig.focus.copy(this.position);
+    this.facing = (this.game.level.def.camera?.yaw ?? 0) + Math.PI;
+    this.aimAngle = this.facing;
+    this.viewHeading = this.facing;
+    this.object.rotation.y = this.facing;
     this.reset();
   }
 
@@ -248,17 +253,11 @@ export class Player {
 
     // --- aim ---------------------------------------------------------------
     const stick = input.aimStick(this._aimStick);
-    if (stick) {
-      this.aimAngle = Math.atan2(stick.x, stick.y);
-      this.aimPoint.set(this.position.x + stick.x * 14, 0, this.position.z + stick.y * 14);
-    } else {
-      this.aimPoint.copy(input.aimWorld);
-      this.aimAngle = Math.atan2(this.aimPoint.x - this.position.x, this.aimPoint.z - this.position.z);
-    }
+    const aiming = !g.traps.buildMode && (input.mouseDown(1) || input.turnDelta !== 0 || !!stick);
+    if (!g.traps.buildMode) this.viewHeading -= stick ? stick.x * dt * 2.5 : input.turnDelta * 0.006;
 
     // --- movement ----------------------------------------------------------
     input.moveVector(this._move);
-    // Screen-relative: W is "up the screen", which is what a top-down player expects.
     const yaw = g.rig.yaw;
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
     const mx = this._move.x * cs - this._move.y * sn;
@@ -284,6 +283,16 @@ export class Player {
 
     this._collide(dt);
     this._crowd(dt);
+
+    const moving = mx !== 0 || mz !== 0;
+    const heading = aiming ? this.viewHeading
+      : this.dodgeT > 0 ? Math.atan2(this.dodgeDir.x, this.dodgeDir.z)
+      : moving ? Math.atan2(mx, mz) : this.facing;
+    this.facing += angleDelta(this.facing, heading) * (1 - Math.exp(-20 * dt));
+    this.aimAngle = this.facing;
+    if (g.traps.buildMode) this.aimPoint.copy(input.aimWorld);
+    else this.aimPoint.set(this.position.x + Math.sin(this.aimAngle) * 14, 0,
+      this.position.z + Math.cos(this.aimAngle) * 14);
 
     // --- weapons -----------------------------------------------------------
     this._handleSwap(input);
@@ -316,15 +325,10 @@ export class Player {
 
     // --- render ------------------------------------------------------------
     this.object.position.copy(this.position);
-    // Always face the cursor. The earlier version faced the movement direction when not
-    // shooting, which meant the hat point, the chest chevron, the weapon and the floor
-    // lance could all disagree — four cues, four answers. Movement is read from the legs
-    // and the cloak instead; direction is read from exactly one place.
-    this.facing += angleDelta(this.facing, this.aimAngle) * Math.min(1, dt * 20);
     this.object.rotation.y = this.facing;
     this.rig.animate(this, dt, Math.hypot(this.velocity.x, this.velocity.z));
 
-    g.rig.follow(this.position, this.aimPoint);
+    g.rig.follow(this.position, null, this.viewHeading);
   }
 
   _tickStatuses(dt) {

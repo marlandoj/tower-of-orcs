@@ -142,7 +142,7 @@ export class UI {
           <button class="btn" data-action="settings">SETTINGS</button>
           <button class="btn" data-action="howto">HOW TO PLAY</button>
         </div>
-        <div class="credits">WASD move · Mouse aim · LMB fire · RMB melee · SPACE dodge · Q weapon · F/C/V spells · TAB build · 1–9 traps · M map · ENTER start wave</div>
+        <div class="credits">WASD move / face travel · Middle-drag orbit / aim · LMB fire · RMB melee · SPACE dodge · Q weapon · F/C/V spells · TAB build · 1–9 traps · M map · ENTER start wave</div>
       </div>
 
       <div id="level-select" class="overlay hidden">
@@ -160,6 +160,11 @@ export class UI {
         <div class="sheet">
           <div class="sheet-head"><h2 class="ornate">HOW TO PLAY</h2></div>
           <div class="howto-body scroll-y">
+            <section><h3>Follow camera</h3>
+              <p>WASD moves and turns the mage toward travel, relative to the camera. Hold the
+                 middle mouse button to aim camera-forward and drag to orbit. Attacks follow your facing.
+                 Scroll to zoom and use <kbd>[</kbd> / <kbd>]</kbd> to tilt.
+                 In build mode, move the cursor to choose a tile.</p></section>
             <section><h3>Build, then fight</h3>
               <p>Between waves press <kbd>TAB</kbd> or click a trap to enter build mode. Click a tile to
                  place, <kbd>R</kbd> to rotate, right-click to sell for 70%. Nothing starts until you press
@@ -613,12 +618,12 @@ export class UI {
     const g = this.game;
     const build = g.traps?.buildMode;
     const rows = g.state === 'wave'
-      ? [['SPACE', 'dodge'], ['Q', 'weapon'], ['F C V', 'spells'], ['TAB', 'build']]
+      ? [['MMB drag', 'orbit / aim'], ['SPACE', 'dodge'], ['Q', 'weapon'], ['F C V', 'spells'], ['TAB', 'build']]
       // Left-click on an existing trap upgrades it — the single least discoverable
       // interaction in build mode, and the reason a trap has tiers at all.
       : build
         ? [['LMB', 'place / upgrade'], ['R', 'rotate'], ['RMB', 'sell 70%'], ['TAB', 'exit build']]
-        : [['TAB', 'build'], ['1–9', 'pick trap'], ['M', 'map'], ['ENTER', 'start wave']];
+        : [['MMB drag', 'orbit / aim'], ['TAB', 'build'], ['1–9', 'pick trap'], ['M', 'map'], ['ENTER', 'start wave']];
     this.el.hints.innerHTML = rows
       .map(([k, v]) => `<span class="hint"><kbd>${k}</kbd>${v}</span>`).join('');
   }

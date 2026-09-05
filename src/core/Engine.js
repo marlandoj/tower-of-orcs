@@ -183,6 +183,18 @@ export class Engine {
    * corridor that wants a lower angle, a vertical throne room that wants a higher one.
    */
   applyLevelCamera(level) {
+    this.rig.obstacles = level?.root.children.filter(child => child !== level.rift?.object) ?? [];
+    this._riftMaterials = [];
+    const materials = new Set();
+    level?.rift?.object.traverse(object => {
+      if (object.material) {
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
+      }
+    });
+    for (const material of materials) {
+      this._riftMaterials.push({ material, opacity: material.opacity,
+        transparent: material.transparent, depthWrite: material.depthWrite });
+    }
     const cam = level?.def?.camera || {};
     if (Number.isFinite(cam.pitch)) this.rig.setPitch(cam.pitch, true);
     else this.rig.resetPitch();
@@ -279,6 +291,15 @@ export class Engine {
 
     this._frameBoss(game);
     this.rig.update(c.rawDt);
+    if (game.level?.rift && game.player) {
+      const separation = game.player.position.distanceTo(game.level.rift.object.position);
+      const opacity = Math.max(0.06, Math.min(1, (separation - 2) / 6));
+      for (const entry of this._riftMaterials ?? []) {
+        entry.material.opacity = entry.opacity * opacity;
+        entry.material.transparent = opacity < 1 || entry.transparent;
+        entry.material.depthWrite = opacity < 1 ? false : entry.depthWrite;
+      }
+    }
     // The composer is a nice-to-have; the frame is not. Anything that throws inside the
     // chain retires it for the session rather than taking the game down with it.
     if (this.postfx.enabled) {

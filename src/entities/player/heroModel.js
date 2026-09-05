@@ -6,8 +6,6 @@ import * as THREE from 'three';
  * a crowd of two hundred orcs that are roughly the same size and the same colour as
  * the floor.
  *
- * At that size, anatomy is worthless. What actually reads is:
- *
  *   1. A ground plate.  A dark vignette band under the hero separates him from the floor
  *      tiles, and a bright rim (drawn with depth-test off, so a scrum cannot bury it)
  *      makes him findable instantly. Nothing else on the field has one.
@@ -15,8 +13,6 @@ import * as THREE from 'three';
  *      cursor, scaled to the equipped weapon's reach. This — not the body — is how you
  *      know where you are shooting, and it is how you learn that the blunderbuss is a
  *      stub and the crossbow is a lance.
- *   3. The hat.         From above the hero is basically a hat. So it is a wide gold
- *      brim with a hard forward point, and the point is the facing.
  *   4. The cloak.       Crimson, wide, and it flares when you move. The only saturated
  *      red on the field that is not blood.
  *   5. A gauge ring.    Sixteen ticks around the plate carry ammo (or mana), and three
@@ -34,7 +30,7 @@ const GOLD = 0xe0a83a;
 const NAVY = 0x27406e;
 const CRIMSON = 0xc4203c;
 const BODY_SCALE = 1.12;
-const BODY_Y = 1.14;
+const BODY_Y = 1.55;
 
 export function buildHero() {
   const group = new THREE.Group();
@@ -43,6 +39,8 @@ export function buildHero() {
     cloth: new THREE.MeshStandardMaterial({ color: NAVY, roughness: 0.85 }),
     trim: new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.3, metalness: 0.75 }),
     skin: new THREE.MeshStandardMaterial({ color: 0xd2a582, roughness: 0.8 }),
+    hair: new THREE.MeshStandardMaterial({ color: 0x35251f, roughness: 0.95 }),
+    eyes: new THREE.MeshStandardMaterial({ color: 0x18202b, roughness: 0.65 }),
     leather: new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 0.9 }),
     cloak: new THREE.MeshStandardMaterial({ color: CRIMSON, roughness: 0.8, side: THREE.DoubleSide }),
     steel: new THREE.MeshStandardMaterial({ color: 0xb6bcc6, roughness: 0.35, metalness: 0.85 }),
@@ -180,20 +178,23 @@ export function buildHero() {
   ground.add(respawn);
 
   // ---------------------------------------------------------------- body
-  // The hero reads as "the one who is not an orc" partly by being physically bigger
-  // than everything below tier 5. Orcs are 1.7-2.15 units; BODY_SCALE puts him at ~2.2.
   const body = new THREE.Group();
   body.position.y = BODY_Y;
   body.scale.setScalar(BODY_SCALE);
   group.add(body);
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.95, 0.54), mats.cloth);
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.31, 0.82, 8), mats.cloth);
+  torso.scale.z = 0.67;
   torso.castShadow = true;
   body.add(torso);
 
-  const sash = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.14, 0.58), mats.trim);
-  sash.position.y = -0.4;
+  const sash = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.12, 8), mats.leather);
+  sash.scale.z = 0.72;
+  sash.position.y = -0.35;
   body.add(sash);
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.04), mats.trim);
+  buckle.position.set(0, -0.35, 0.25);
+  body.add(buckle);
   // A gold chest chevron pointing forward: the second facing cue after the hat point.
   const chevron = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.42, 3), mats.trim);
   chevron.rotation.set(Math.PI / 2, 0, Math.PI);
@@ -202,7 +203,7 @@ export function buildHero() {
 
   // The cloak is the biggest coloured area from above — deliberately oversized.
   const cloak = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.42, 1.02, 1.55, 10, 1, true, Math.PI * 0.28, Math.PI * 1.44),
+    new THREE.CylinderGeometry(0.38, 0.74, 1.35, 10, 1, true, Math.PI * 0.28, Math.PI * 1.44),
     mats.cloak,
   );
   cloak.position.set(0, -0.32, -0.1);
@@ -210,60 +211,95 @@ export function buildHero() {
   cloak.castShadow = true;
   body.add(cloak);
   const cloakTrim = new THREE.Mesh(
-    new THREE.TorusGeometry(0.44, 0.045, 5, 12, Math.PI * 1.44).rotateX(Math.PI / 2),
+    new THREE.TorusGeometry(0.36, 0.035, 5, 12, Math.PI * 1.44).rotateX(Math.PI / 2),
     mats.trim,
   );
-  cloakTrim.rotation.z = -Math.PI * 0.28 - Math.PI * 1.44 + Math.PI / 2;
+  cloakTrim.rotation.y = -Math.PI * 0.28 - Math.PI * 1.44 + Math.PI / 2;
   cloakTrim.position.set(0, 0.44, -0.1);
   body.add(cloakTrim);
 
   // Head + hat -----------------------------------------------------------------
   const neck = new THREE.Group();
-  neck.position.y = 0.6;
+  neck.position.y = 0.56;
   body.add(neck);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.44, 0.4), mats.skin);
-  head.position.y = 0.08;
+  const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.19, 8), mats.skin);
+  throat.position.y = -0.12;
+  neck.add(throat);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mats.skin);
+  head.scale.set(0.22, 0.28, 0.21);
+  head.position.set(0, 0.12, 0.02);
   head.castShadow = true;
   neck.add(head);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.13, 5), mats.skin);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0.13, 0.25);
+  neck.add(nose);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.48), mats.hair);
+  hair.scale.set(0.23, 0.29, 0.22);
+  hair.position.set(0, 0.13, -0.015);
+  neck.add(hair);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 6, 5), mats.skin);
+    ear.scale.set(0.055, 0.085, 0.055);
+    ear.position.set(side * 0.215, 0.11, 0);
+    neck.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.027, 6, 4), mats.eyes);
+    eye.scale.y = 0.65;
+    eye.position.set(side * 0.087, 0.19, 0.204);
+    neck.add(eye);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.023, 0.025), mats.hair);
+    brow.position.set(side * 0.087, 0.235, 0.195);
+    brow.rotation.z = side * 0.08;
+    neck.add(brow);
+  }
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.014, 0.018), mats.hair);
+  mouth.position.set(0, 0.014, 0.212);
+  neck.add(mouth);
 
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.86, 0.07, 14), mats.trim);
-  brim.position.y = 0.3;
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.43, 0.045, 14), mats.trim);
+  brim.scale.z = 0.8;
+  brim.position.set(0, 0.37, -0.08);
   brim.castShadow = true;
   neck.add(brim);
-  // The point. From straight above this triangle is the whole facing read — so it is
-  // deliberately steel against the gold brim: same shape in one colour reads as a blob.
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.78, 3), mats.steel);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 3), mats.steel);
   beak.rotation.set(Math.PI / 2, 0, Math.PI);
-  beak.position.set(0, 0.32, 0.78);
+  beak.position.set(0, 0.39, 0.28);
   neck.add(beak);
-  const crown = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.75, 8), mats.cloth);
-  crown.position.y = 0.68;
+  const crown = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.48, 8), mats.cloth);
+  crown.position.set(0, 0.62, -0.08);
   crown.castShadow = true;
   neck.add(crown);
   const crownTip = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), glow);
-  crownTip.position.y = 1.08;
+  crownTip.position.set(0, 0.89, -0.08);
   neck.add(crownTip);
 
   // Arms -----------------------------------------------------------------------
   const arms = [];
   for (const sx of [-1, 1]) {
     const shoulder = new THREE.Group();
-    shoulder.position.set(sx * 0.48, 0.36, 0);
+    shoulder.position.set(sx * 0.42, 0.32, 0);
     body.add(shoulder);
     // Bright pauldrons widen the silhouette; from above they frame the hat.
-    const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), mats.steel);
+    const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), mats.steel);
     pauldron.scale.set(1.15, 0.8, 1.0);
     pauldron.castShadow = true;
     shoulder.add(pauldron);
-    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.48, 0.22), mats.cloth);
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.105, 0.48, 8), mats.cloth);
     upper.position.y = -0.26;
     shoulder.add(upper);
     const forearm = new THREE.Group();
     forearm.position.y = -0.48;
     shoulder.add(forearm);
-    const lower = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.44, 0.21), mats.leather);
-    lower.position.y = -0.2;
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.08, 0.34, 8), mats.leather);
+    lower.position.y = -0.17;
     forearm.add(lower);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), mats.skin);
+    hand.scale.set(0.085, 0.12, 0.09);
+    hand.position.set(0, -0.4, 0.025);
+    forearm.add(hand);
+    const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 4), mats.skin);
+    thumb.position.set(-sx * 0.075, -0.37, 0.08);
+    forearm.add(thumb);
     arms.push({ shoulder, forearm, side: sx });
   }
 
@@ -282,17 +318,17 @@ export function buildHero() {
   const legs = [];
   for (const sx of [-1, 1]) {
     const hip = new THREE.Group();
-    hip.position.set(sx * 0.2, -0.5, 0);
+    hip.position.set(sx * 0.18, -0.4, 0);
     body.add(hip);
-    const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.48, 0.25), mats.cloth);
-    thigh.position.y = -0.24;
+    const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.44, 8), mats.cloth);
+    thigh.position.y = -0.22;
     thigh.castShadow = true;
     hip.add(thigh);
     const knee = new THREE.Group();
-    knee.position.y = -0.48;
+    knee.position.y = -0.44;
     hip.add(knee);
-    const shin = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.44, 0.23), mats.leather);
-    shin.position.y = -0.22;
+    const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.09, 0.4, 8), mats.leather);
+    shin.position.y = -0.2;
     knee.add(shin);
     const boot = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.16, 0.42), mats.leather);
     boot.position.set(0, -0.44, 0.07);

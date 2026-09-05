@@ -90,6 +90,8 @@ export class Game {
 
     this.state = 'build';
     this.bus.emit('level:load', { levelIndex: index, level: this.level });
+    this.rig.follow(this.player.position, null, this.player.viewHeading);
+    this.rig.snap();
     this.ui.setPhase('build');
     this.bus.emit('phase:build', { nextWaveIndex: 0 });
   }

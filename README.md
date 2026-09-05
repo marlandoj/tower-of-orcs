@@ -20,12 +20,20 @@ npm run dev
 
 Then open **http://127.0.0.1:5173/**
 
+The third-person camera follows the mage's position without rotating when movement changes.
+WASD moves relative to the camera and turns the mage toward travel, including backward and
+diagonal movement. Hold the middle mouse button and drag horizontally to orbit and aim,
+or use the controller's right stick. Attacks follow the mage's facing; holding middle mouse
+aims toward the camera's forward direction. The mouse wheel adjusts distance, and `[` / `]` adjust camera tilt.
+In build mode the camera keeps its heading while the cursor selects trap placement.
+
 ## Controls
 
 | Input | Action |
 |---|---|
-| `WASD` | Move (screen-relative) |
-| Mouse | Aim |
+| `WASD` | Move and face travel direction, relative to the camera |
+| Middle-mouse drag | Orbit camera and aim; hold to face camera-forward |
+| Mouse | Position traps in build mode |
 | `LMB` | Fire / place trap in build mode |
 | `RMB` | Melee / sell trap in build mode |
 | `Space` | Dodge roll (i-frames) |

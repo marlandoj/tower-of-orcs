@@ -18,7 +18,7 @@ Run with `npm run dev` → http://127.0.0.1:5173
 - **Y is up.** Floor sits at `y = 0`. Ceiling at `y = CEIL_H = 6`.
 - Grid coordinate `(gx, gz)` maps to world centre `(gx * TILE + TILE/2, 0, gz * TILE + TILE/2)`
   via `Grid.toWorld()`. Never hand-roll this conversion.
-- Camera is a fixed-angle perspective rig looking down at ~52°, following the player.
+- Camera is a third-person perspective rig following the player's position with independently controlled orbit heading, smooth yaw, adjustable zoom/pitch, and a collision-shortened camera boom. Movement turns the character without rotating the camera; deliberate aiming faces camera-forward.
 
 ## 2. Module ownership
 

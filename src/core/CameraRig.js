@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { damp, clamp } from '../shared/rng.js';
+import { damp, clamp, angleDelta } from '../shared/rng.js';
 
 const DEG = Math.PI / 180;
 
@@ -46,25 +46,32 @@ export class CameraRig {
      * The player-controlled pitch band. `pitch` is what the rig uses; `pitchTarget` is what
      * the player asked for, damped into it so a held key sweeps rather than snaps.
      */
-    this.pitchMin = 38 * DEG;
+    this.pitchMin = 28 * DEG;
     this.pitchMax = 58 * DEG;
-    this.pitchDefault = 45 * DEG;
+    this.pitchDefault = 32 * DEG;
     this.pitch = this.pitchDefault;
     this.pitchTarget = this.pitchDefault;
     this.yaw = 0;                            // level-authored, quarter turns only
-    this.distance = 38;
-    this.distanceTarget = 38;
+    this.yawTarget = null;
+    this.obstacles = null;
+    this._cameraRay = new THREE.Raycaster();
+    this._cameraHits = [];
+    this._cameraAnchor = new THREE.Vector3();
+    this._cameraDirection = new THREE.Vector3();
+    this._boomLength = 15;
+    this.distance = 15;
+    this.distanceTarget = 15;
     // 20, not 26. What pinned the close end was the boom cutting through pillars and floors
     // below ~20; `minHeight` now makes that impossible by construction, so it can open up.
-    this.minDistance = 20;
+    this.minDistance = 10;
     // 62, not 92. 92 was the setting the audit's "architecture photography" frames were shot
     // at, and no amount of authored default fixes a band whose top end is a satellite view.
-    this.maxDistance = 62;
+    this.maxDistance = 24;
     this.height = 0;
     /** Authored-distance -> play-distance mapping; see `fromAuthored()`. */
-    this.authoredScale = 0.5;
+    this.authoredScale = 0.15;
     this.authoredRefIn = 52;
-    this.authoredRefOut = 34;
+    this.authoredRefOut = 15;
     /** Degrees per second a held tilt key sweeps, and how fast `pitch` chases the target. */
     this.tiltRate = 34;
     this.pitchDamp = 0.002;
@@ -194,8 +201,14 @@ export class CameraRig {
   }
 
   /** `aim` is the world point under the cursor; the camera leans toward it. */
-  follow(position, aim = null) {
+  follow(position, aim = null, facing = null) {
     this.target.copy(position);
+    if (Number.isFinite(facing)) {
+      this.yawTarget = facing + Math.PI;
+      this.target.y += 1.3;
+      this.lookahead.set(0, 0, 0);
+      return;
+    }
     if (aim) {
       this.lookahead.set(aim.x - position.x, 0, aim.z - position.z);
       const len = this.lookahead.length();
@@ -299,6 +312,7 @@ export class CameraRig {
   }
   /** Jump the camera to its target framing — for level load, where damping would be a swoop. */
   snap() {
+    this.yawTarget = this.yaw;
     this.pitch = this.pitchTarget;
     const sinPitch = Math.sin(this.pitch);
     this.distance = sinPitch > 1e-3
@@ -347,6 +361,7 @@ export class CameraRig {
   }
 
   _clampToBounds() {
+    if (this.yawTarget !== null) return;
     const b = this._bounds;
     if (!b) return;
     const v = this._view;
@@ -366,6 +381,9 @@ export class CameraRig {
   }
 
   update(dt) {
+    if (this.yawTarget !== null) {
+      this.yaw += angleDelta(this.yaw, this.yawTarget) * (1 - Math.exp(-10 * dt));
+    }
     // Pitch first: everything below (view footprint, bounds clamp, collision) is derived
     // from it, so chasing the target after they are computed costs a frame of lag on a tilt.
     if (Math.abs(this.pitch - this.pitchTarget) > 1e-5) {
@@ -374,14 +392,14 @@ export class CameraRig {
       this._dirty = true;
     }
 
-    const framed = this._framedDistance(dt);
+    const framed = this.yawTarget !== null ? this.distanceTarget : this._framedDistance(dt);
 
     this._desired.copy(this.target).addScaledVector(this.lookahead, this.lookaheadAmount);
     // Lean the look-at toward the framing subject as well as toward the cursor. Without
     // this the pull-back is symmetric about the player and half of it is spent on empty
     // floor behind him; with it the extra room lands where the boss actually is.
     const s = this._subject;
-    if (s.blend > 0.002) {
+    if (this.yawTarget === null && s.blend > 0.002) {
       const k = this.subjectPull * s.blend;
       this._desired.x += (s.x - this.target.x) * k;
       this._desired.z += (s.z - this.target.z) * k;
@@ -424,6 +442,28 @@ export class CameraRig {
     ).multiplyScalar(this.distance);
 
     this.camera.position.copy(this.focus).add(this._offset);
+    if (this.yawTarget !== null && this.obstacles) {
+      this._cameraAnchor.copy(this.focus);
+      this._cameraAnchor.y += this.distance * 0.045;
+      this._cameraDirection.subVectors(this.camera.position, this._cameraAnchor);
+      const fullLength = this._cameraDirection.length();
+      this._cameraDirection.normalize();
+      this._cameraRay.set(this._cameraAnchor, this._cameraDirection);
+      this._cameraRay.far = fullLength + 0.6;
+      this._cameraHits.length = 0;
+      this._cameraRay.intersectObjects(this.obstacles, true, this._cameraHits);
+      let clearLength = fullLength;
+      for (const hit of this._cameraHits) {
+        const material = Array.isArray(hit.object.material)
+          ? hit.object.material[hit.face.materialIndex] : hit.object.material;
+        if (!hit.object.visible || !material || material.transparent) continue;
+        clearLength = Math.max(0.8, Math.min(fullLength, hit.distance - 0.7));
+        break;
+      }
+      this._boomLength = clearLength < this._boomLength ? clearLength
+        : damp(this._boomLength, clearLength, 0.005, dt);
+      this.camera.position.copy(this._cameraAnchor).addScaledVector(this._cameraDirection, this._boomLength);
+    }
     // Aim slightly above the ground so the player sits just under centre and the frame
     // spends its pixels on what is walking toward you, not on the floor behind you.
     this.camera.lookAt(this.focus.x, this.focus.y + this.distance * 0.045, this.focus.z);

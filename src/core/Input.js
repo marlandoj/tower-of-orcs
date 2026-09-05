@@ -46,6 +46,7 @@ export class Input {
      */
     this.mouse = { x: 0, y: 0, ndc: new THREE.Vector2(), buttons: 0, wheel: 0, zoomWheel: 0, tiltWheel: 0 };
     this.mousePressed = 0;
+    this.turnDelta = 0;
     this.mouseReleased = 0;
     this.pointerLocked = false;
     /** World-space point under the cursor on the y=0 plane. Updated by Engine each frame. */
@@ -88,6 +89,7 @@ export class Input {
 
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('pointerdown', (e) => {
+      if (e.button === 1) e.preventDefault();
       c.setPointerCapture?.(e.pointerId);
       this.mouse.buttons |= 1 << e.button;
       this.mousePressed |= 1 << e.button;
@@ -98,7 +100,11 @@ export class Input {
       this.mouse.buttons &= ~(1 << e.button);
       this.mouseReleased |= 1 << e.button;
     });
-    addEventListener('pointermove', (e) => { this._setMouse(e); this.lastInputKind = 'kbm'; });
+    addEventListener('pointermove', (e) => {
+      if (this.mouse.buttons & 2) this.turnDelta += e.movementX;
+      this._setMouse(e);
+      this.lastInputKind = 'kbm';
+    });
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
       if (e.shiftKey) { this.mouse.wheel += Math.sign(e.deltaY); return; }
@@ -216,6 +222,7 @@ export class Input {
     this.mouse.wheel = 0;
     this.mouse.zoomWheel = 0;
     this.mouse.tiltWheel = 0;
+    this.turnDelta = 0;
     this._frameId++;
   }
 }
