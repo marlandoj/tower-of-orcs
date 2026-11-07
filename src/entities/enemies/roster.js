@@ -8,6 +8,9 @@ import {
   siegeBlocker, wreckTrap, losClear, heroDist2,
 } from './abilities.js';
 
+/** Seconds before the same orc can be healed again by any shaman (see Blood Shaman). */
+const HEAL_LOCKOUT = 4.0;
+
 /**
  * The orc roster. Every entry must answer one question: *what does this one make the
  * player do differently?* An enemy that only has more HP is not a new enemy.
@@ -140,8 +143,17 @@ export const ROSTER = [
         e.abilityCd = 4.5;
         e.state = 'attack'; e.stateT = 0;   // the cast animation is the tell
         // Heal + haste the pack. A shaman left alive doubles the wave's effective HP.
+        //
+        // Heals do not stack. Each orc can be healed once per HEAL_LOCKOUT whoever casts,
+        // and shamans heal each other for half. Without that, the 12-14 shamans of Level 3's
+        // last waves each topped up every ally in range — and each other — every 4.5s,
+        // which no killbox the level's purse can buy was able to out-damage.
+        const now = game.clock.elapsed;
         const n = pulse(e, game, 9, (o) => {
-          o.hp = Math.min(o.hpMax, o.hp + o.hpMax * 0.18);
+          if (now - (o._healedAt ?? -99) < HEAL_LOCKOUT) return;
+          o._healedAt = now;
+          const amount = o.hpMax * 0.18 * (o.has('healer') ? 0.5 : 1);
+          o.hp = Math.min(o.hpMax, o.hp + amount);
           o.addStatus(status('haste', 3.0, 0.30), game);
           game.fx.ring(o.position, 0.6, [1, 0.25, 0.5], 6);
         }, [1, 0.2, 0.45], 14);

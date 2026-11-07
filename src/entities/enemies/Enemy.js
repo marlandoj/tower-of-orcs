@@ -91,6 +91,7 @@ export class Enemy {
     this.leapPounce = this.leapVX = this.leapVY = this.leapVZ = undefined;
     this.siegeCd = this.siegeCheck = this.siegeHit = this.siegeTarget = undefined;
     this._chew = undefined;
+    this._healedAt = undefined;
     this.statuses.length = 0;
     recomputeStatusMods(this);
 
