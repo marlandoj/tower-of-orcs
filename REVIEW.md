@@ -181,3 +181,21 @@ Status labels:
    - Wire up the `player:*` events.
    - Reconcile `ARCHITECTURE.md`.
    - Add Vitest suites for `src/shared/Damage.js`, `src/director/Scoring.js`, `src/core/Save.js` and `src/world/Flow.js`.
+
+## Implementation status
+
+The suggested next steps were worked through on this branch, one commit per step. Each step
+was checked with `npm run build`, the dev harness bot (`src/director/devHarness.js`, run
+headless in Chromium), and from step 6 on, `npm test`.
+
+| Step | Commit | Done | Deferred / decided against |
+|---|---|---|---|
+| 1. Stabilization | `Stabilize simulation…` | Top-10 #1, #4, #5; stun/freeze ordering; watchdog double count; pooled `slamT`; Stalker ambush; Arcane Lance skip; guardian double damage and repeat death; frozen Pounder; save normalization | — |
+| 2. Performance | `Performance quick wins…` | Fixed trap-light pool (top-10 #2); grid-DDA camera boom (top-10 #3); particle update ranges; coalesced coin/combo HUD; renderer flags | Orc instancing refactor: needs a GPU profile first. Removing the camera raycast alone took a headless level-1 run from about 42 s to about 1 s. |
+| 3. Promises kept | `Keep the game's promises…` | Spellbook tier 3 (tiers are now a +20%/tier damage and HP bonus applied once in the trap funnel); level-3 Spring throws unstoppables (never bosses); crush ignores armour and goes over shields; Pounder and Blades hit flyers; threat and upgrade text | — |
+| 4. Balance | `Balance: Blood Shaman…` | Non-stacking shaman heals (per-target 4 s lockout; healers heal healers for half) | Level 3 economy left unchanged: measured, the idle bracket still loses and the floor bracket still clears with no leaks. Anti-heal status not added. |
+| 5. Input | `Input layer…` | Per-frame pad sampling; pause, build, trap bar and map are Input actions; Start pauses, Back/View starts waves; d-pad trap cycling; R reload/rotate conflict; Controls rebinding in Settings; pause on focus loss | Colourblind cues, reduce-flashes, camera sensitivity |
+| 6. Hygiene | `Hygiene and tests…` | Debug tooling DEV-only; barricade clamp removed; HUD writes diffed; `level:start` emitted; ARCHITECTURE.md reconciled; trap-chain fix; Vitest with 19 tests | Hand-rolled `Math.floor(x/4)` cell maths; splitting the large files |
+
+Not started (outside the suggested next steps): crossbow and Spike Floor tuning, the
+early-start bonus meter, trap repair and undo, and the remaining UNVERIFIED low items.
