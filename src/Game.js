@@ -58,7 +58,10 @@ export class Game {
     this.bus.on('game:defeat', () => { this.state = 'defeat'; });
     this.bus.on('game:victory', () => { this.state = 'victory'; });
 
-    installDebug(this);
+    // Cheats, automation and the dev-server screenshot endpoint are development tools.
+    // `import.meta.env.DEV` is a build-time constant, so a production bundle drops the
+    // call and, with it, the whole Debug module.
+    if (import.meta.env.DEV) installDebug(this);
   }
 
   start() {
@@ -94,6 +97,7 @@ export class Game {
     this.rig.snap();
     this.ui.setPhase('build');
     this.bus.emit('phase:build', { nextWaveIndex: 0 });
+    this.bus.emit('level:start', { levelIndex: index });
   }
 
   restartLevel() { this.loadLevel(this.levelIndex); }

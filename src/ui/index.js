@@ -1048,16 +1048,19 @@ export class UI {
     if (this.el.hud.classList.contains('hidden')) return;
     this.tutorial.update(dt);
 
+    // Vitals are polled (regen and mana tick every frame, so events alone would miss
+    // them) but only *written* when the displayed value changes: unconditional style and
+    // text writes invalidated style 60 times a second for numbers that sat still.
     const p = g.player;
     if (p) {
       const f = Math.max(0, p.hp / p.hpMax);
-      this.el.hpFill.style.width = `${f * 100}%`;
-      this.el.hpFill.style.setProperty('--fill', f > 0.5 ? '#5fc96a' : f > 0.25 ? '#ffb020' : '#ff3826');
-      this.el.hpText.textContent = Math.ceil(p.hp);
+      setStyle(this.el.hpFill, 'width', `${(f * 100).toFixed(1)}%`);
+      setStyle(this.el.hpFill, '--fill', f > 0.5 ? '#5fc96a' : f > 0.25 ? '#ffb020' : '#ff3826');
+      setText(this.el.hpText, Math.ceil(p.hp));
       if (p.manaMax) {
         const mf = Math.max(0, p.mana / p.manaMax);
-        this.el.manaFill.style.width = `${mf * 100}%`;
-        this.el.manaText.textContent = `${Math.floor(p.mana)}`;
+        setStyle(this.el.manaFill, 'width', `${(mf * 100).toFixed(1)}%`);
+        setText(this.el.manaText, Math.floor(p.mana));
         // The dry state has to be a *state*, not an absence: a weapon that costs more
         // mana than you hold is the reason your clicks are doing nothing.
         const cost = p.weapon?.def?.mana ?? 0;
@@ -1065,8 +1068,8 @@ export class UI {
       }
       const w = p.weapon;
       if (w) {
-        this.el.weaponName.textContent = w.def.name +
-          (w.reloading > 0 ? ' — RELOADING' : (w.ammo !== Infinity ? `  ${w.ammo}/${w.def.magazine}` : ''));
+        setText(this.el.weaponName, w.def.name +
+          (w.reloading > 0 ? ' — RELOADING' : (w.ammo !== Infinity ? `  ${w.ammo}/${w.def.magazine}` : '')));
         // Holding the button on a semi-auto weapon: light the label rather than swallow
         // the input silently.
         if (w.def.auto === false && !g.traps?.buildMode && g.input?.mouseDown?.(0)) {
@@ -1083,7 +1086,10 @@ export class UI {
 
     if (g.director?.running) {
       const n = g.director.remaining;
-      this.el.remaining.innerHTML = `<span class="rem-n">${n}</span><span class="rem-l">ORCS LEFT</span>`;
+      if (this.el.remaining._n !== n) {
+        this.el.remaining._n = n;
+        this.el.remaining.innerHTML = `<span class="rem-n">${n}</span><span class="rem-l">ORCS LEFT</span>`;
+      }
       this.el.remaining.classList.remove('hidden');
     } else this.el.remaining.classList.add('hidden');
   }
@@ -1117,4 +1123,19 @@ function crest() {
       <path d="M28 28l10 4-6 6zM92 28l-4 10-6-6zM28 92l4-10 6 6zM92 92l-10-4 6-6z"/>
     </g>
   </svg>`;
+}
+
+/** Write `textContent` only when it changes. */
+function setText(el, v) {
+  const s = String(v);
+  if (el._txt !== s) { el._txt = s; el.textContent = s; }
+}
+
+/** Write one style property (or `--custom-property`) only when it changes. */
+function setStyle(el, key, v) {
+  const cache = el._sty || (el._sty = Object.create(null));
+  if (cache[key] === v) return;
+  cache[key] = v;
+  if (key.startsWith('--')) el.style.setProperty(key, v);
+  else el.style[key] = v;
 }

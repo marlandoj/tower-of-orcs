@@ -58,6 +58,9 @@ game.fx           // FX facade
 game.ui           // UI facade
 game.bus          // EventBus
 game.state        // 'menu' | 'build' | 'wave' | 'paused' | 'defeat' | 'victory'
+game.simulating   // true only in 'build' | 'wave'. Simulation systems (player, enemies,
+                  // traps, director) gate on this whitelist, never on a blacklist of states.
+game.returnToMenu() // abandon the run (clears enemies, leaves build mode, shows the title)
 game.rng          // seeded RNG: game.rng() -> [0,1)
 ```
 
@@ -89,12 +92,16 @@ game.bus.off('enemy:killed', fn)
 | `build:mode` | `{ on, selected }` — build mode toggled |
 | `build:select` | `{ id }` — a different trap became the active brush |
 | `trap:damaged` | `{ trap, amount, source, remaining }` |
+| `trap:upgraded` | `{ trap, level, cost }` |
+| `trap:destroyed` | `{ trap }` — wrecked by the horde, felled guardian, or collapsed barricade |
+| `enemy:shield-broken` | `{ enemy, position }` |
+| `engine:resize` | `{ w, h }` — canvas size in CSS pixels |
 | `trap:combo` | `{ name, trap, enemy, bonus, position }` |
 | `player:damaged` | `{ amount, remaining }` |
 | `player:died` | `{}` |
 | `player:weapon` | `{ id, index }` — active weapon changed |
-| `player:spell` | `{ id, remaining }` — spell cast or came off cooldown |
-| `player:progression` | `{ points, bought }` — upgrade points spent or granted |
+| `player:spell` | `{ id, cooldown }` — spell cast; `cooldown` is the seconds until it is ready |
+| `player:progression` | `{ points, ranks, gained?, bought? }` — points granted (`gained`), spent (`bought`), or reset |
 | `combo:changed` | `{ combo, multiplier }` |
 | `coin:changed` | `{ coin, delta, reason }` |
 | `score:changed` | `{ score, delta }` |
@@ -148,6 +155,11 @@ spec = { amount, type: 'physical'|'fire'|'ice'|'arcane'|'poison'|'lightning'|'cr
 
 Resistances/immunities live on the enemy archetype (`resist: { fire: 0.5, crush: 0 }` where the
 number is the *multiplier*, 0 = immune, 1 = normal, >1 = vulnerable).
+
+Order inside the funnel: resistance → status multipliers → directional shield (skipped by
+`crush`, which comes from above) → flat armour (`physical` only, floored at 15%). Trap damage
+first passes through `trapDamage` in `src/traps/combos.js`, which applies combo multipliers and
+the spellbook tier bonus (`src/shared/progression.js`) exactly once.
 
 ### Enemy archetype contract (`src/entities/enemies/roster.js`)
 
@@ -239,6 +251,15 @@ ui.showResults(payload) ui.showLevelSelect() ui.setPhase(phase)
   `src/shared/scratch.js`.
 - One `THREE.InstancedMesh` per repeated static prop (bricks, torches, banners).
 - Shadows: a single directional light with a tight cascade box around the player.
+- **The point-light count must never change during play.** three.js keys every lit program on
+  it, so adding, removing or toggling `visible` on a light recompiles every lit material.
+  Traps request light through `TrapLight` proxies served by a fixed `TrapLightPool`
+  (`src/traps/parts.js`); pooled lights go dark with `intensity = 0`.
+- Never raycast the merged level meshes per frame. They span the whole map, so bounding
+  volumes reject nothing. Camera collision marches the grid instead (`boomHit` in
+  `src/core/CameraRig.js`).
+- Debug tooling (`src/core/Debug.js`, `window.__GAME__`, `window.dbg`) is installed only under
+  `import.meta.env.DEV` and is absent from production builds.
 
 ## 5. Feel targets (the bar)
 

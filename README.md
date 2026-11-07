@@ -20,6 +20,12 @@ npm run dev
 
 Then open **http://127.0.0.1:5173/**
 
+Run the unit tests (damage, saves, grid/flow, camera collision, scoring, spellbook) with:
+
+```bash
+npm test
+```
+
 The third-person camera follows the mage's position without rotating when movement changes.
 WASD moves relative to the camera and turns the mage toward travel, including backward and
 diagonal movement. Hold the middle mouse button and drag horizontally to orbit and aim,

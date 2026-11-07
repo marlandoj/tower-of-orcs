@@ -229,7 +229,9 @@ export class Scoring {
 
     // --- trap chain: three different traps in a row means your layers are working ---
     if (p.byTrap && p.trapId) {
-      if (this._chain[this._chain.length - 1] === p.trapId) this._chain.length = 0;
+      // A repeat anywhere in the chain breaks it, not only an immediate one: A-B-A is two
+      // traps, and the bonus is for three *different* ones.
+      if (this._chain.includes(p.trapId)) this._chain.length = 0;
       this._chain.push(p.trapId);
       if (this._chain.length >= CHAIN_LENGTH) {
         extraScore += base * CHAIN_BONUS;

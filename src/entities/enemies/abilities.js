@@ -168,28 +168,16 @@ const NOOP = () => {};
  * Structural damage from an enemy to something in the traps module.
  *
  * Always `TrapManager.wreck` — that is the contract, and `destroy()` from out here means
- * "this is gone", not "an orc hit it". The one wrinkle is barricades, and it is worth
- * spelling out because it is not obvious from the call site:
- *
- * `wreck()` hands a *lethal* blow straight to `destroy()`, and `destroy()` on a blocker
- * takes the plain removal path — it never runs `_barricadeCollapse`. So a wall finished by
- * an orc's own damage silently vanishes instead of coming down on whoever broke it: no
- * crush, no stun, no rubble. Verified: an Ogre slam that took a barricade from 120 hp to 0
- * produced "Barricade destroyed!" and left the Ogre on full health, unstunned.
- *
- * That collapse is TRAPS' mechanic and it is explicitly meant to be the player's second
- * answer to an Ogre, so we never take a blocker's last point of hp. We leave it a sliver
- * and let `TrapManager._updateBarricade` — which already sees every sapper and ogre
- * pressed against the wall — notice and drop it properly, collapse and all.
- *
- * Reported to TRAPS. When `destroy()` routes a dead blocker to `_barricadeCollapse`, this
- * clamp should be deleted and the call becomes a plain `game.traps.wreck(...)`.
+ * "this is gone", not "an orc hit it". A lethal blow to a barricade is routed by
+ * `destroy()` to `_barricadeCollapse`, so the crush and stun on whoever broke it happen
+ * whether the last point of hp came from an orc or from anything else. (This used to clamp
+ * blocker damage to `hp - 1` as a workaround from before that routing existed.)
  */
 export function wreckTrap(game, t, amount, source) {
-  if (t.def.blocker) amount = Math.min(amount, t.hp - 1);
-  if (amount <= 0) return 0;
+  if (amount <= 0 || !t || t.destroyed) return 0;
+  const dealt = Math.min(amount, Math.max(0, t.hp));
   game.traps.wreck(t, amount, source);
-  return amount;   // what was actually put in, so a floating number can never lie
+  return dealt;   // what actually landed, so a floating number can never lie
 }
 
 /** How many traps/barricades a slam of this radius would touch. No allocation. */
