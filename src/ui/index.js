@@ -579,7 +579,31 @@ export class UI {
     this.el.riftPlaque.classList.toggle('critical', f <= 0.3);
   }
 
+  // Coin and combo change on every kill, and a Pounder can kill twenty orcs in one frame.
+  // Writing the DOM (and forcing layout to restart the CSS animation) per event thrashed
+  // layout exactly at the best moment of a wave, so the events only record the latest
+  // value and _flushHud() applies it once per frame.
   _setCoin(coin, delta) {
+    this._pend ||= {};
+    this._pend.coin = coin;
+    if (delta) this._pend.coinDelta = (this._pend.coinDelta || 0) + delta;
+  }
+
+  _setCombo(combo, mult) {
+    this._pend ||= {};
+    this._pend.combo = combo;
+    this._pend.mult = mult;
+  }
+
+  _flushHud() {
+    const p = this._pend;
+    if (!p) return;
+    this._pend = null;
+    if (p.coin !== undefined) this._applyCoin(p.coin, p.coinDelta);
+    if (p.combo !== undefined) this._applyCombo(p.combo, p.mult);
+  }
+
+  _applyCoin(coin, delta) {
     this.el.coin.textContent = coin.toLocaleString();
     if (delta) {
       const el = this.el.coin.parentElement;
@@ -590,7 +614,7 @@ export class UI {
     this._refreshAffordable();
   }
 
-  _setCombo(combo, mult) {
+  _applyCombo(combo, mult) {
     const el = this.el.combo;
     if (combo < 3) { el.classList.remove('show'); return; }
     el.classList.add('show');
@@ -958,6 +982,7 @@ export class UI {
   update(dt) {
     const g = this.game;
     const raw = g.clock?.rawDt ?? dt;
+    this._flushHud();
 
     // Menus can be driven by a pad on any screen, including the pause overlay.
     if (this._current) {

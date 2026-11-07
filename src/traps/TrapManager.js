@@ -4,7 +4,7 @@ import { TILE, DIRS } from '../world/Grid.js';
 import { buildGuardian } from './guardianModel.js';
 import { BuildGhost, angleFor } from './ghost.js';
 import { trapDamage, updateFlights, clearFlights, resetComboTeaching } from './combos.js';
-import { levelPips, disposeTrap, ringMesh } from './parts.js';
+import { levelPips, disposeTrap, ringMesh, TrapLightPool } from './parts.js';
 import { status } from '../shared/Damage.js';
 import { v0, v1 } from '../shared/scratch.js';
 
@@ -69,6 +69,8 @@ export class TrapManager {
     this.root = new THREE.Group();
     this.root.name = 'traps';
     game.scene.add(this.root);
+    // Owned by the scene, not `root`, and never removed: see TrapLightPool.
+    this.lightPool = new TrapLightPool(game.scene, 4);
 
     this.buildMode = false;
     this.selectedId = null;
@@ -142,6 +144,7 @@ export class TrapManager {
     }
 
     if (this.buildMode) this._updateGhost(dt);
+    this.lightPool.assign(this.list, g.player.position);
   }
 
   _stepTrap(t, dt) {
@@ -399,7 +402,11 @@ export class TrapManager {
     const c = grid.cell(gx, gz);
 
     const obj = this._buildBody(def);
-    obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    const lights = [];
+    obj.traverse((o) => {
+      if (o.isTrapLight) lights.push(o);
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    });
     grid.toWorld(gx, gz, v0);
     obj.position.set(v0.x, 0, v0.z);
     if (def.surface === 'wall' || def.surface === 'floor') obj.rotation.y = angleFor(def, dir);
@@ -412,6 +419,7 @@ export class TrapManager {
 
     const trap = {
       def, gx, gz, dir, level: 1 + tier, object: obj, rig: obj.userData.rig || null,
+      lights: lights.length ? lights : null,
       world: new THREE.Vector3(v0.x, 0, v0.z),
       cooldownLeft: 0, kills: 0, enabled: true, destroyed: false,
       hp: hpFor(def, tier), hpMax: hpFor(def, tier),
@@ -993,6 +1001,7 @@ export class TrapManager {
     for (const t of Array.from(this.list)) this._remove(t);
     this.list.length = 0;
     clearFlights();
+    this.lightPool.off();
     this.buildMode = false;
     this.ghost.setVisible(false);
   }

@@ -44,6 +44,82 @@ export function lamp(color, intensity = 2.4) {
     color, emissive: color, emissiveIntensity: intensity, roughness: 0.35, metalness: 0.2,
   });
 }
+/**
+ * A light *request*, not a light. Traps animate `intensity` exactly as they would a
+ * PointLight, but nothing is added to the renderer: the TrapManager hands a small fixed
+ * pool of real lights to whichever requests matter most this frame (TrapLightPool).
+ *
+ * Why: three.js keys every lit shader program on the scene's point-light count, so a
+ * trap that owned a PointLight recompiled every lit material in the scene each time one
+ * was placed, sold, previewed by the build ghost, or blew up — a visible hitch each time.
+ */
+export class TrapLight extends THREE.Object3D {
+  constructor(color, intensity = 1, distance = 10, decay = 2) {
+    super();
+    this.isTrapLight = true;
+    this.color = new THREE.Color(color);
+    this.intensity = intensity;
+    this.distance = distance;
+    this.decay = decay;
+  }
+}
+
+/**
+ * The real lights behind every TrapLight. Fixed count for the life of the game, so the
+ * light count (and therefore every program key) never changes; unused slots sit at
+ * intensity 0, never `visible = false`, which would change the count just the same.
+ */
+export class TrapLightPool {
+  constructor(parent, size = 4) {
+    this.lights = [];
+    this._pick = [];
+    this._score = [];
+    this._w = new THREE.Vector3();
+    for (let i = 0; i < size; i++) {
+      const l = new THREE.PointLight(0xffffff, 0, 10, 2);
+      l.name = 'trap-light-' + i;
+      parent.add(l);
+      this.lights.push(l);
+    }
+  }
+
+  /** Give the pool to the brightest requests nearest `focus`. Allocation-free. */
+  assign(traps, focus) {
+    const n = this.lights.length;
+    const pick = this._pick, score = this._score;
+    pick.length = 0; score.length = 0;
+    for (let i = 0; i < traps.length; i++) {
+      const t = traps[i];
+      if (t.destroyed || !t.lights) continue;
+      for (let j = 0; j < t.lights.length; j++) {
+        const req = t.lights[j];
+        if (!(req.intensity > 0.01)) continue;
+        req.getWorldPosition(this._w);
+        const dx = this._w.x - focus.x, dz = this._w.z - focus.z;
+        const s = req.intensity / (1 + (dx * dx + dz * dz) / 400);
+        // Insertion into a top-n list; n is tiny.
+        let k = pick.length;
+        if (k === n && s <= score[n - 1]) continue;
+        if (k < n) { pick.push(req); score.push(s); } else { k = n - 1; }
+        while (k > 0 && score[k - 1] < s) { pick[k] = pick[k - 1]; score[k] = score[k - 1]; k--; }
+        pick[k] = req; score[k] = s;
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const l = this.lights[i];
+      const req = pick[i];
+      if (!req) { l.intensity = 0; continue; }
+      req.getWorldPosition(l.position);
+      l.color.copy(req.color);
+      l.intensity = req.intensity;
+      l.distance = req.distance;
+      l.decay = req.decay;
+    }
+  }
+
+  off() { for (const l of this.lights) l.intensity = 0; }
+}
+
 /** Fresh unlit additive material for glows and markers. */
 export function glow(color, opacity = 0.6) {
   return new THREE.MeshBasicMaterial({

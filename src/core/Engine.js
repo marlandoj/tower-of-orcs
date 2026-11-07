@@ -20,12 +20,17 @@ export class Engine {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      // The composer renders into its own MSAA target and only blits one fullscreen quad
+      // to the canvas, so an antialiased default framebuffer was pure cost (an extra MSAA
+      // surface plus resolve at up to DPR 2).
+      antialias: false,
       powerPreference: 'high-performance',
       stencil: false,
-      // Lets automated review capture the exact frame that was rendered, even when the
-      // page is not compositing (headless verification, CI screenshots).
-      preserveDrawingBuffer: true,
+      // Preserving the back buffer costs a copy every frame. `dbg.shot()` reads from its
+      // own render target and does not need it; add `?capture` to the URL for tools that
+      // read the canvas directly.
+      preserveDrawingBuffer: typeof location !== 'undefined'
+        && new URLSearchParams(location.search).has('capture'),
     });
     this._maxPixelRatio = Math.min(devicePixelRatio || 1, 2);
     this.renderer.setPixelRatio(this._maxPixelRatio);
@@ -183,7 +188,7 @@ export class Engine {
    * corridor that wants a lower angle, a vertical throne room that wants a higher one.
    */
   applyLevelCamera(level) {
-    this.rig.obstacles = level?.root.children.filter(child => child !== level.rift?.object) ?? [];
+    this.rig.collisionGrid = level?.game?.grid ?? null;
     this._riftMaterials = [];
     const materials = new Set();
     level?.rift?.object.traverse(object => {

@@ -108,12 +108,18 @@ export class ParticleSystem {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = renderOrder;
     scene.add(this.mesh);
-    this._dirty = false;
+    this._attrs = [this.aPos, this.aVel, this.aCol, this.aPar];
+    // Slots written since the last upload. Emission is a ring buffer, so they are always
+    // one contiguous run starting at `_from` (wrapping at most once).
+    this._from = 0;
+    this._count = 0;
   }
 
   /** mode: 0 soft puff, 1 spark streak, 2 smoke */
   emit(x, y, z, vx, vy, vz, r, g, b, a, size, life, mode = 0) {
     const i = this.cursor;
+    if (this._count === 0) this._from = i;
+    if (this._count < this.capacity) this._count++;
     this.cursor = (this.cursor + 1) % this.capacity;
     const p3 = i * 3, p4 = i * 4;
     this.aPos.array[p3] = x; this.aPos.array[p3 + 1] = y; this.aPos.array[p3 + 2] = z;
@@ -121,23 +127,36 @@ export class ParticleSystem {
     this.aCol.array[p4] = r; this.aCol.array[p4 + 1] = g; this.aCol.array[p4 + 2] = b; this.aCol.array[p4 + 3] = a;
     this.aPar.array[p4] = this.time; this.aPar.array[p4 + 1] = life;
     this.aPar.array[p4 + 2] = size; this.aPar.array[p4 + 3] = mode;
-    this._dirty = true;
   }
 
   update(dt) {
     this.time += dt;
     this.material.uniforms.uTime.value = this.time;
-    if (this._dirty) {
-      this.aPos.needsUpdate = true; this.aVel.needsUpdate = true;
-      this.aCol.needsUpdate = true; this.aPar.needsUpdate = true;
-      this._dirty = false;
+    if (this._count > 0) {
+      // Upload only the slots written this frame. Without ranges a single spark
+      // re-uploaded all four full buffers (~560 KB across both systems), every frame
+      // anything emitted — which during a wave is every frame.
+      const n = this._count, from = this._from, cap = this.capacity;
+      for (const a of this._attrs) {
+        a.clearUpdateRanges();
+        if (n < cap) {
+          const s = a.itemSize;
+          const first = Math.min(n, cap - from);
+          a.addUpdateRange(from * s, first * s);
+          if (first < n) a.addUpdateRange(0, (n - first) * s);
+        }
+        a.needsUpdate = true;
+      }
+      this._count = 0;
     }
   }
 
   clear() {
     this.aPar.array.fill(0);
     this.aCol.array.fill(0);
-    this.aPar.needsUpdate = true; this.aCol.needsUpdate = true;
+    // Full re-upload on the next update().
+    this._from = 0;
+    this._count = this.capacity;
     this.cursor = 0;
   }
 

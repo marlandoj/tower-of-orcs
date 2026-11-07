@@ -46,8 +46,9 @@ export class PlayerProjectiles {
     // PointLights are the fastest way to blow the forward renderer's light budget.
     this._lights = [];
     for (let i = 0; i < MAX_GLOW_LIGHTS; i++) {
+      // Always `visible`, dark when unused: toggling visibility changes the scene's light
+      // count, and every lit shader program is keyed on that count.
       const l = new THREE.PointLight(0xffffff, 0, 14, 2);
-      l.visible = false;
       this.root.add(l);
       this._lights.push(l);
     }
@@ -128,7 +129,7 @@ export class PlayerProjectiles {
     p.kind.onImpact?.(this.game, p, hit, hitWall);
     p.mesh.visible = false;
     this._giveMesh(p.kindId, p.mesh);
-    if (p.light) { p.light.visible = false; p.light.intensity = 0; p.light = null; }
+    if (p.light) { p.light.intensity = 0; p.light = null; }
     p.mesh = null; p.params = null; p.kind = null;
     this._free.push(p);
     this._assignLights();
@@ -136,7 +137,7 @@ export class PlayerProjectiles {
 
   /** Newest glowing projectiles win the limited light slots. */
   _assignLights() {
-    for (const l of this._lights) { l.visible = false; l.intensity = 0; }
+    for (const l of this._lights) l.intensity = 0;
     let slot = 0;
     for (let i = this.active.length - 1; i >= 0 && slot < this._lights.length; i--) {
       const p = this.active[i];
@@ -145,7 +146,6 @@ export class PlayerProjectiles {
       l.color.setHex(p.kind.glowColor ?? p.kind.color ?? 0xffffff);
       l.distance = p.kind.glowRange ?? 13;
       l.intensity = p.kind.glowIntensity ?? 6;
-      l.visible = true;
       l.position.set(p.x, p.y, p.z);
       p.light = l;
     }
@@ -176,7 +176,7 @@ export class PlayerProjectiles {
       p.mesh = null; p.params = null; p.kind = null; p.light = null;
       this._free.push(p);
     }
-    for (const l of this._lights) { l.visible = false; l.intensity = 0; }
+    for (const l of this._lights) l.intensity = 0;
     this.tracers.clear();
   }
 

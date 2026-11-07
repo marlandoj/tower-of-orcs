@@ -6,6 +6,7 @@ import { trapDamage, launch } from './combos.js';
 import {
   M, GEO, lamp, glow, instance, box, cyl, boltedPlate, gear, spikeBed,
   floorFrame, marker, ringMesh, runeBand, greebles, stripeMat, statusBulb, approach, bar,
+  TrapLight,
 } from './parts.js';
 
 /**
@@ -434,7 +435,7 @@ export const TRAPS = [
       const cord = cyl(0.05, 0.7, M.darkWood, 0, 1.95, 0);
       cord.rotation.z = 0.4;
       g.add(cord);
-      const light = new THREE.PointLight(0xff6a20, 1.2, 7, 2);
+      const light = new TrapLight(0xff6a20, 1.2, 7, 2);
       light.position.set(0, 2.0, 0);
       g.add(light);
 
@@ -976,7 +977,7 @@ export const TRAPS = [
       const disc = new THREE.Mesh(new THREE.CircleGeometry(TILE * 0.44, 20).rotateX(-Math.PI / 2), glowMat);
       disc.position.y = 0.08;
       g.add(disc);
-      const light = new THREE.PointLight(0xff5a10, 3, 11, 2);
+      const light = new TrapLight(0xff5a10, 3, 11, 2);
       light.position.y = 0.9;
       g.add(light);
 
@@ -1236,7 +1237,7 @@ export const TRAPS = [
       core.scale.setScalar(0.5);
       core.position.y = 4.5;
       g.add(core);
-      const light = new THREE.PointLight(0x70b0ff, 2.2, 15, 2);
+      const light = new TrapLight(0x70b0ff, 2.2, 15, 2);
       light.position.y = 4.4;
       g.add(light);
       const field = ringMesh(TILE * 1.2, TILE * 1.28, 0x70b0ff, 0.07);
@@ -1438,7 +1439,7 @@ export const TRAPS = [
         shards.add(s);
       }
       g.add(shards);
-      const light = new THREE.PointLight(0x9b5cff, 3, 14, 2);
+      const light = new TrapLight(0x9b5cff, 3, 14, 2);
       light.position.y = 2.8;
       g.add(light);
       const field = ringMesh(TILE * 1.0, TILE * 1.08, 0x9b5cff, 0.08);

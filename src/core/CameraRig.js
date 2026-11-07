@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { damp, clamp, angleDelta } from '../shared/rng.js';
+import { TILE, CEIL_H } from '../world/Grid.js';
 
 const DEG = Math.PI / 180;
 
@@ -53,9 +54,11 @@ export class CameraRig {
     this.pitchTarget = this.pitchDefault;
     this.yaw = 0;                            // level-authored, quarter turns only
     this.yawTarget = null;
-    this.obstacles = null;
-    this._cameraRay = new THREE.Raycaster();
-    this._cameraHits = [];
+    // Boom collision runs against the level grid (wall cells up to `CEIL_H`), not the
+    // render meshes: the level is merged into a few map-sized meshes whose bounding
+    // volumes never reject a ray, so a three.js raycast tested every triangle in JS every
+    // frame. Marching ~10 grid cells is the same answer for the walls that matter.
+    this.collisionGrid = null;
     this._cameraAnchor = new THREE.Vector3();
     this._cameraDirection = new THREE.Vector3();
     this._boomLength = 15;
@@ -442,24 +445,14 @@ export class CameraRig {
     ).multiplyScalar(this.distance);
 
     this.camera.position.copy(this.focus).add(this._offset);
-    if (this.yawTarget !== null && this.obstacles) {
+    if (this.yawTarget !== null && this.collisionGrid) {
       this._cameraAnchor.copy(this.focus);
       this._cameraAnchor.y += this.distance * 0.045;
       this._cameraDirection.subVectors(this.camera.position, this._cameraAnchor);
       const fullLength = this._cameraDirection.length();
       this._cameraDirection.normalize();
-      this._cameraRay.set(this._cameraAnchor, this._cameraDirection);
-      this._cameraRay.far = fullLength + 0.6;
-      this._cameraHits.length = 0;
-      this._cameraRay.intersectObjects(this.obstacles, true, this._cameraHits);
-      let clearLength = fullLength;
-      for (const hit of this._cameraHits) {
-        const material = Array.isArray(hit.object.material)
-          ? hit.object.material[hit.face.materialIndex] : hit.object.material;
-        if (!hit.object.visible || !material || material.transparent) continue;
-        clearLength = Math.max(0.8, Math.min(fullLength, hit.distance - 0.7));
-        break;
-      }
+      const hitT = boomHit(this.collisionGrid, this._cameraAnchor, this._cameraDirection, fullLength + 0.6);
+      const clearLength = hitT < 0 ? fullLength : Math.max(0.8, Math.min(fullLength, hitT - 0.7));
       this._boomLength = clearLength < this._boomLength ? clearLength
         : damp(this._boomLength, clearLength, 0.005, dt);
       this.camera.position.copy(this._cameraAnchor).addScaledVector(this._cameraDirection, this._boomLength);
@@ -497,4 +490,30 @@ function noise(x) {
 function hash(n) {
   n = (n << 13) ^ n;
   return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 0x7fffffff;
+}
+
+/**
+ * Distance along a ray to the first solid wall, or -1. A 2D DDA (Amanatides & Woo) over
+ * the grid in XZ; a wall cell is solid from the floor up to `CEIL_H`, so a boom passing
+ * over the top of a wall is clear. The cell the ray starts in is never a hit, and leaving
+ * the map ends the march (there is nothing out there to collide with).
+ */
+export function boomHit(grid, o, d, maxT) {
+  const inv = 1 / TILE;
+  let gx = Math.floor(o.x * inv), gz = Math.floor(o.z * inv);
+  const sx = d.x > 0 ? 1 : -1, sz = d.z > 0 ? 1 : -1;
+  const adx = Math.abs(d.x), adz = Math.abs(d.z);
+  const dtx = adx > 1e-9 ? TILE / adx : Infinity;
+  const dtz = adz > 1e-9 ? TILE / adz : Infinity;
+  let tx = adx > 1e-9 ? ((sx > 0 ? (gx + 1) * TILE - o.x : o.x - gx * TILE) / adx) : Infinity;
+  let tz = adz > 1e-9 ? ((sz > 0 ? (gz + 1) * TILE - o.z : o.z - gz * TILE) / adz) : Infinity;
+  for (let i = 0; i < 64; i++) {
+    let t;
+    if (tx < tz) { t = tx; tx += dtx; gx += sx; } else { t = tz; tz += dtz; gz += sz; }
+    if (t > maxT) return -1;
+    if (!grid.inBounds(gx, gz)) return -1;
+    const c = grid.cells[gz * grid.w + gx];
+    if (c.kind === 'wall' && o.y + d.y * t < CEIL_H) return t;
+  }
+  return -1;
 }
