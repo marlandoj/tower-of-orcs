@@ -3,7 +3,7 @@ import { LEVELS } from '../world/LevelDefs.js';
 import { trapIcon, trapAccent, surfaceIcon, threatIcon, skullRow, COIN, SKULL, LOCK, DIVIDER, GATE } from './icons.js';
 import { readThreat, trapAnswers, trapCadence } from './threat.js';
 import { renderSpellbook, tierOf, upgrade, respec, earnedSkulls, esc } from './spellbook.js';
-import { renderSettings, readSetting, writeSetting, applyAllSettings, SETTINGS, pct } from './settings.js';
+import { renderSettings, readSetting, writeSetting, applyAllSettings, SETTINGS, pct, saveBind, resetBinds, keyLabel, controlRows } from './settings.js';
 import { renderResults } from './results.js';
 import { renderWeapons, syncWeapons, renderSpells, syncSpells, renderSkills } from './loadout.js';
 import { Minimap } from './minimap.js';
@@ -270,6 +270,15 @@ export class UI {
     });
     this.el.trapbar.addEventListener('focusout', () => this._hideTip());
 
+    // Losing focus mid-wave (alt-tab, a notification) pauses instead of letting the horde
+    // walk in unopposed. Held keys are already released by Input.
+    g.input.onBlur = () => {
+      if (readSetting(g, 'pauseOnBlur') && g.simulating && !this._current) {
+        g.pause();
+        this._open('pause', { stack: false });
+      }
+    };
+
     // Settings sliders live-update as they are dragged.
     this.root.addEventListener('input', (e) => {
       const el = e.target;
@@ -354,6 +363,14 @@ export class UI {
         break;
       }
       case 'sk-respec': g.player?.progression?.respec(); this._renderSkills(); break;
+      case 'rebind': {
+        // Capture the next key in _onKey. Escape cancels.
+        if (this._rebinding) this._rebinding.btn.textContent = this._rebinding.text;
+        this._rebinding = { action: b.dataset.bind, btn: b, text: b.textContent };
+        b.textContent = 'Press a key…';
+        break;
+      }
+      case 'rebind-reset': resetBinds(g); this._rebinding = null; this._renderSettings(); break;
       case 'set-toggle': {
         const key = b.dataset.key;
         const v = !readSetting(g, key);
@@ -376,31 +393,67 @@ export class UI {
     }
   }
 
+  /**
+   * DOM keys are for *menus* only. Gameplay hotkeys (pause, build, trap bar, map) are
+   * polled as Input actions in _pollHotkeys, so a pad and a rebound key reach them too.
+   */
   _onKey(e) {
     const g = this.game;
-    // Menus first: an open overlay owns the keyboard.
-    if (this._current && this.nav.handleKey(e)) { e.preventDefault(); return; }
+    if (this._rebinding) {
+      e.preventDefault();
+      const { action, btn, text } = this._rebinding;
+      this._rebinding = null;
+      if (e.code === 'Escape') { btn.textContent = text; return; }
+      saveBind(g, action, e.code);
+      const clash = controlRows(g).find((r) => r.action !== action
+        && (g.input.binds[r.action] || []).includes(e.code)
+        && !['rotate', 'reload'].every((a) => a === r.action || a === action));
+      if (clash) this.toast(`${keyLabel(e.code)} is also bound to ${clash.label}`, 'info');
+      this._renderSettings();
+      this._overlayKeyFrame = g.input._frameId;
+      return;
+    }
+    if (!this._current) return;
+    // When an overlay consumes a key, note the frame so the polled pause action does not
+    // also act on it (Escape closing the pause menu must not immediately re-open it).
+    const consumed = () => { this._overlayKeyFrame = g.input._frameId; };
+    if (this.nav.handleKey(e)) { e.preventDefault(); consumed(); return; }
 
     if (e.code === 'Escape') {
+      consumed();
       if (this._current === 'armoury') { this.closeShop(); return; }
       // Results has no "back" — the player has to choose what happens next.
       if (BACKABLE.includes(this._current)) { this._back(); return; }
-      if (g.state === 'paused') { g.resume(); this.hideAll(); }
-      else if (g.state === 'wave' || g.state === 'build') { g.pause(); this._open('pause', { stack: false }); }
-      return;
+      if (this._current === 'pause' && g.state === 'paused') { g.resume(); this.hideAll(); }
     }
-    if (this._current) return;   // gameplay hotkeys only when no overlay is up
+  }
 
-    if (e.code === 'Tab' && (g.state === 'build' || g.state === 'wave')) g.traps.toggleBuild();
+  _pollHotkeys() {
+    const g = this.game, inp = g.input;
+    if (!inp || this._overlayKeyFrame === inp._frameId) return;
+    if (inp.pressed('pause')) {
+      if (!this._current && g.simulating) { g.pause(); this._open('pause', { stack: false }); return; }
+      if (this._current === 'pause' && g.state === 'paused') { g.resume(); this.hideAll(); return; }
+    }
+    if (this._current || !g.simulating) return;   // gameplay hotkeys only with no overlay up
+
+    if (inp.pressed('build')) g.traps.toggleBuild();
     // The map is the one HUD element big enough to be worth hiding, so it gets a key.
-    if (e.code === 'KeyM' && (g.state === 'build' || g.state === 'wave')) {
+    if (inp.pressed('minimap')) {
       this.minimap.setEnabled(!this.minimap.enabled);
       this.el.minimap.classList.toggle('hidden', !this.minimap.enabled);
     }
-    const n = /^Digit([1-9])$/.exec(e.code);
-    if (n && (g.state === 'build' || g.state === 'wave')) {
-      const id = g.traps.available[Number(n[1]) - 1];
+    const avail = g.traps.available;
+    for (let i = 1; i <= 9; i++) {
+      if (!inp.pressed('trap' + i)) continue;
+      const id = avail[i - 1];
       if (id) g.traps.select(id);
+    }
+    // D-pad cycles the whole bar — the only way a pad reaches traps past the ninth.
+    const step = inp.pressed('trapNext') ? 1 : inp.pressed('trapPrev') ? -1 : 0;
+    if (step && avail.length) {
+      const at = Math.max(0, avail.indexOf(g.traps.selectedId));
+      g.traps.select(avail[(at + step + avail.length) % avail.length]);
     }
   }
 
@@ -983,6 +1036,7 @@ export class UI {
     const g = this.game;
     const raw = g.clock?.rawDt ?? dt;
     this._flushHud();
+    this._pollHotkeys();
 
     // Menus can be driven by a pad on any screen, including the pause overlay.
     if (this._current) {

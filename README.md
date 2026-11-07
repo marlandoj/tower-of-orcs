@@ -39,10 +39,30 @@ In build mode the camera keeps its heading while the cursor selects trap placeme
 | `Space` | Dodge roll (i-frames) |
 | `Tab` | Toggle build mode |
 | `1`–`9` | Select trap |
-| `R` | Rotate trap / reload |
-| `Q` | Swap weapon |
+| `R` | Rotate trap (build mode) / reload (otherwise) |
+| `Q` / `Shift`+wheel | Swap weapon |
+| `F` / `C` / `V` | Spells: Frost Nova / Blink / Arcane Lance |
+| Wheel / `Alt`+wheel | Camera distance / camera tilt |
+| `M` | Toggle the map |
 | `Enter` | Start the next wave |
 | `Esc` | Pause |
+
+Every key above except the menu keys can be rebound under **Settings → Controls**. The game
+pauses itself when the window loses focus (toggle in Settings).
+
+### Controller
+
+| Button | Action |
+|---|---|
+| Left stick / right stick | Move / orbit camera and aim |
+| `RT` / `LT` | Fire / melee (place / sell in build mode) |
+| `A` | Dodge roll |
+| `X` | Reload |
+| `Y` | Toggle build mode |
+| `LB` / `RB` | Rotate trap / swap weapon |
+| D-pad left / right | Previous / next trap |
+| `Back` (View) | Start the next wave |
+| `Start` | Pause |
 
 ## The loop
 

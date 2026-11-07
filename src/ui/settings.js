@@ -12,7 +12,51 @@ export const SETTINGS = [
     hint: 'How hard the camera kicks on impacts.' },
   { key: 'blood', label: 'Blood & gore', kind: 'range', min: 0, max: 1.5, step: 0.05, def: 1.0 },
   { key: 'damageNumbers', label: 'Damage numbers', kind: 'toggle', def: true },
+  { key: 'pauseOnBlur', label: 'Pause when focus is lost', kind: 'toggle', def: true,
+    hint: 'Alt-tab or a notification pauses a live wave instead of letting it run.' },
 ];
+
+/**
+ * Rebindable actions, in the order they are listed. Spells are appended at render time
+ * from the hero's spellbook so a new spell shows up here without editing this file.
+ * Menus keep Escape / arrows / Enter regardless, so a bad bind can never lock a player out.
+ */
+export const CONTROLS = [
+  ['up', 'Move forward'], ['down', 'Move back'], ['left', 'Move left'], ['right', 'Move right'],
+  ['dodge', 'Dodge roll'], ['reload', 'Reload'], ['swapWeapon', 'Swap weapon'],
+  ['build', 'Build mode'], ['rotate', 'Rotate trap'], ['startWave', 'Start next wave'],
+  ['pause', 'Pause'], ['minimap', 'Toggle map'], ['tiltUp', 'Camera tilt up'], ['tiltDown', 'Camera tilt down'],
+];
+
+/** Human label for a KeyboardEvent.code. */
+export function keyLabel(code) {
+  if (!code) return '—';
+  return code
+    .replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow/, '')
+    .replace('BracketLeft', '[').replace('BracketRight', ']').replace('Backquote', '`')
+    .replace('Escape', 'Esc');
+}
+
+export function controlRows(game) {
+  const rows = CONTROLS.map(([action, label]) => ({ action, label }));
+  for (const s of game.player?.spells?.list ?? []) rows.push({ action: `spell:${s.def.id}`, label: `Spell: ${s.def.name}` });
+  return rows;
+}
+
+/** Persist one action's bind and apply it live. */
+export function saveBind(game, action, code) {
+  const saved = { ...(readSetting(game, 'keybinds') || {}) };
+  saved[action] = [code];
+  game.save?.setSetting?.('keybinds', saved);
+  game.input?.rebind(action, [code]);
+}
+
+export function resetBinds(game) {
+  game.save?.setSetting?.('keybinds', {});
+  game.input?.resetBinds();
+  // Spells own their default keys; re-register them.
+  for (const s of game.player?.spells?.list ?? []) game.input.binds[`spell:${s.def.id}`] = [s.def.key];
+}
 
 export function readSetting(game, key) {
   const s = game.save?.setting ?? {};
@@ -39,6 +83,7 @@ export function applySetting(game, key, value) {
 /** Called once at boot so a reloaded save sounds like it did when the player left. */
 export function applyAllSettings(game) {
   for (const s of SETTINGS) applySetting(game, s.key, readSetting(game, s.key));
+  game.input?.applyBinds(readSetting(game, 'keybinds'));
 }
 
 export function renderSettings(game) {
@@ -62,11 +107,21 @@ export function renderSettings(game) {
       </div>`;
   }).join('');
 
+  const binds = game.input?.binds ?? {};
+  const controls = controlRows(game).map(({ action, label }) => `
+      <div class="set-row">
+        <span class="set-label">${label}</span>
+        <button class="btn key-bind" data-action="rebind" data-bind="${action}">${(binds[action] || []).map(keyLabel).join(' / ') || '—'}</button>
+      </div>`).join('');
+
   return `
     <div class="sheet settings-sheet">
       <div class="sheet-head"><h2 class="ornate">SETTINGS</h2></div>
       <div class="set-list">${rows}</div>
+      <div class="sheet-head"><h3 class="ornate">CONTROLS</h3></div>
+      <div class="set-list controls-list">${controls}</div>
       <div class="menu">
+        <button class="btn" data-action="rebind-reset">RESET CONTROLS</button>
         <button class="btn" data-action="wipe">ERASE PROGRESS</button>
         <button class="btn primary" data-action="back">BACK</button>
       </div>

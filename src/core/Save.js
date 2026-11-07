@@ -109,6 +109,6 @@ function defaults() {
     totalSkulls: 0,
     spellbook: {},        // trapId -> upgrade tier
     seenTutorial: false,
-    settings: { master: 0.8, sfx: 1.0, music: 0.45, shake: 1.0, damageNumbers: true, blood: 1.0 },
+    settings: { master: 0.8, sfx: 1.0, music: 0.45, shake: 1.0, damageNumbers: true, blood: 1.0, pauseOnBlur: true },
   };
 }

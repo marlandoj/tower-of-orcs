@@ -317,7 +317,7 @@ export class Player {
       if (this._fireBuffer > 0 && this.swapT <= 0 && w.cooldown <= 0 && w.reloading <= 0) this._tryFire(w);
       if (input.mouseClicked(2)) this._melee();
     }
-    if (input.pressed('reload') && w.ammo < (w.def.magazine ?? 0) && w.reloading <= 0) {
+    if (!g.traps.buildMode && input.pressed('reload') && w.ammo < (w.def.magazine ?? 0) && w.reloading <= 0) {
       w.reloading = w.def.reloadTime ?? 1.2;
       g.audio.play('ui.click', { pitch: 0.55 });
     }

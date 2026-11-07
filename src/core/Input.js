@@ -6,7 +6,7 @@ import { plane0, ray0 } from '../shared/scratch.js';
  * Actions are polled (`input.down('fire')`) or edge-tested (`input.pressed('dodge')`).
  * Edge state is cleared once per frame by Engine after all systems update.
  */
-const DEFAULT_BINDS = {
+export const DEFAULT_BINDS = {
   up: ['KeyW', 'ArrowUp'],
   down: ['KeyS', 'ArrowDown'],
   left: ['KeyA', 'ArrowLeft'],
@@ -16,9 +16,12 @@ const DEFAULT_BINDS = {
   reload: ['KeyR'],
   build: ['Tab'],
   swapWeapon: ['KeyQ'],
-  spell1: ['Digit1'], spell2: ['Digit2'], spell3: ['Digit3'], spell4: ['Digit4'],
-  spell5: ['Digit5'], spell6: ['Digit6'], spell7: ['Digit7'], spell8: ['Digit8'],
+  // The trap bar. Spells register their own `spell:<id>` actions (spells.js).
+  trap1: ['Digit1'], trap2: ['Digit2'], trap3: ['Digit3'], trap4: ['Digit4'], trap5: ['Digit5'],
+  trap6: ['Digit6'], trap7: ['Digit7'], trap8: ['Digit8'], trap9: ['Digit9'],
+  minimap: ['KeyM'],
   pause: ['Escape'],
+  // Shares R with reload on purpose: rotate is only read in build mode, reload only out of it.
   rotate: ['KeyR'],
   /**
    * Camera tilt. `tiltUp` raises the camera toward top-down, `tiltDown` drops it toward the
@@ -34,7 +37,7 @@ const DEFAULT_BINDS = {
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
-    this.binds = { ...DEFAULT_BINDS };
+    this.binds = Object.fromEntries(Object.entries(DEFAULT_BINDS).map(([k, v]) => [k, [...v]]));
     this.keys = new Set();
     this.keysPressed = new Set();
     this.keysReleased = new Set();
@@ -59,17 +62,35 @@ export class Input {
     /** Every bound code, plus the ones with a page-level default we cannot live with. */
     this._swallow = new Set(['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backquote']);
     for (const codes of Object.values(this.binds)) for (const c of codes) this._swallow.add(c);
+    // Gamepad button state as of the end of the previous frame, sampled for *every*
+    // mapped action whether or not anything asked about it (see endFrame).
     this._padPrev = Object.create(null);
-    this._padFrame = Object.create(null);
     this._frameId = 0;
     this._install();
   }
 
   /** Re-derive the swallow set after a rebind, so a newly bound key stops scrolling the page. */
   rebind(action, codes) {
-    this.binds[action] = codes;
+    this.binds[action] = [...codes];
     for (const c of codes) this._swallow.add(c);
   }
+
+  /** Apply a saved `{ action: [codes] }` map over the defaults; unknown actions ignored. */
+  applyBinds(saved) {
+    if (!saved || typeof saved !== 'object') return;
+    for (const [action, codes] of Object.entries(saved)) {
+      if (!(action in this.binds) || !Array.isArray(codes)) continue;
+      const clean = codes.filter((c) => typeof c === 'string' && c);
+      if (clean.length) this.rebind(action, clean);
+    }
+  }
+
+  resetBinds() {
+    for (const [k, v] of Object.entries(DEFAULT_BINDS)) this.binds[k] = [...v];
+  }
+
+  /** Called on window blur, after held keys are released. Set by the UI. */
+  onBlur = null;
 
   _install() {
     const c = this.canvas;
@@ -85,7 +106,10 @@ export class Input {
       if (!e.ctrlKey && !e.metaKey && !e.altKey && this._swallow.has(e.code)) e.preventDefault();
     }, { passive: false });
     addEventListener('keyup', (e) => { this.keys.delete(e.code); this.keysReleased.add(e.code); });
-    addEventListener('blur', () => { this.keys.clear(); this.mouse.buttons = 0; });
+    addEventListener('blur', () => {
+      this.keys.clear(); this.mouse.buttons = 0;
+      this.onBlur?.();
+    });
 
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('pointerdown', (e) => {
@@ -200,18 +224,21 @@ export class Input {
     return !!btn && (btn.pressed || btn.value > 0.4);
   }
   /**
-   * Edge state has to be latched once per frame: `pressed()` is queried by more than one
-   * system per action, and the old version consumed the edge on whichever asked first.
+   * A press is "down now, up at the end of last frame". The previous state is sampled for
+   * every mapped button in endFrame(), not lazily when an action is queried: lazily, a
+   * button released while nobody was asking (Start, during a whole wave) still read as
+   * held, and the next real press was swallowed.
    */
   _padPressed(action) {
-    if (this._padFrame[action] !== this._frameId) {
-      const now = this._padDown(action);
-      this._padFrame[action] = this._frameId;
-      this._padEdge ||= Object.create(null);
-      this._padEdge[action] = now && !this._padPrev[action];
-      this._padPrev[action] = now;
+    return this._padDown(action) && !this._padPrev[action];
+  }
+
+  _samplePad() {
+    const pad = this._pad();
+    for (const action in PAD_MAP) {
+      const btn = pad?.buttons[PAD_MAP[action]];
+      this._padPrev[action] = !!btn && (btn.pressed || btn.value > 0.4);
     }
-    return this._padEdge[action];
   }
 
   endFrame() {
@@ -223,6 +250,7 @@ export class Input {
     this.mouse.zoomWheel = 0;
     this.mouse.tiltWheel = 0;
     this.turnDelta = 0;
+    this._samplePad();
     this._frameId++;
   }
 }
@@ -234,8 +262,13 @@ function isEditable(el) {
   return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || el.isContentEditable === true;
 }
 
+/**
+ * Standard-mapping gamepad buttons. Start pauses; Back/View starts the next wave (it used
+ * to share Start with pause, and only one of them could ever win). The d-pad cycles the
+ * trap bar during play; menus own it while an overlay is open.
+ */
 const PAD_MAP = {
   fire: 7, altFire: 6, dodge: 0, interact: 2, build: 3, reload: 2,
-  swapWeapon: 5, pause: 9, startWave: 9, rotate: 4,
+  swapWeapon: 5, pause: 9, startWave: 8, rotate: 4, trapPrev: 14, trapNext: 15,
 };
 const dz = (v, t = 0.18) => (Math.abs(v) < t ? 0 : (v - Math.sign(v) * t) / (1 - t));
