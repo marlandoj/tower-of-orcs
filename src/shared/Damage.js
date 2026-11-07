@@ -42,7 +42,9 @@ export function applyDamage(target, spec, game) {
   if (target.statusMods) amount *= target.statusMods.damageTaken ?? 1;
 
   // --- Directional shield: heavy reduction inside the frontal arc ---
-  if (target.shield && target.shield.hp > 0 && spec.position) {
+  // Crush comes down from above, over the top of a held shield: "flank them, or crush
+  // through" is the documented answer to Shieldbearers.
+  if (target.shield && target.shield.hp > 0 && spec.position && type !== 'crush') {
     const dx = spec.position.x - target.position.x;
     const dz = spec.position.z - target.position.z;
     const fx = Math.sin(target.facing), fz = Math.cos(target.facing);
@@ -60,7 +62,8 @@ export function applyDamage(target, spec, game) {
   }
 
   // --- Flat armour, physical only, floored at 15% so armour is never a hard wall ---
-  if (target.armor && (type === 'physical' || type === 'crush')) {
+  // Crush ignores armour: it is the advertised answer to Ironhides and the Orc King.
+  if (target.armor && type === 'physical') {
     amount = Math.max(amount * 0.15, amount - target.armor);
   }
 

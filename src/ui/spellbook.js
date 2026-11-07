@@ -11,12 +11,14 @@ import { trapCadence } from './threat.js';
  * *inside* of a level, skulls are the *between*, so upgrading never competes with
  * building and the two economies stay legible.
  *
- * Tier N costs N skulls (1 + 2 + 3 = 6 to master a trap) and maps straight onto the
- * existing `trap.level` field, which the trap roster already uses to scale damage by
- * +35% a tier. UI applies it on `trap:placed` — see index.js.
+ * Tier N costs N skulls (1 + 2 + 3 = 6 to master a trap). Each tier is a permanent
+ * damage and toughness bonus on every copy of that trap, applied in the trap damage
+ * funnel (combos.trapDamage) — see shared/progression.js for the numbers.
  */
 
-export const MAX_TIER = 3;
+import { MAX_SPELLBOOK_TIER, SPELLBOOK_DAMAGE_PER_TIER } from '../shared/progression.js';
+
+export const MAX_TIER = MAX_SPELLBOOK_TIER;
 export const TIER_NAMES = ['', 'Reinforced', 'Runed', 'Mastered'];
 
 /** Cost in skulls to go from `tier` to `tier + 1`. */
@@ -75,8 +77,8 @@ export function respec(save) {
   save.flush();
 }
 
-/** Damage bonus a tier grants, matching the roster's own `(level - 1) * 0.35`. */
-export const tierBonus = (tier) => Math.round(tier * 35);
+/** Damage bonus a tier grants, in percent — the same constant the trap funnel applies. */
+export const tierBonus = (tier) => Math.round(tier * SPELLBOOK_DAMAGE_PER_TIER * 100);
 
 // ------------------------------------------------------------------ rendering
 export function renderSpellbook(game, { context = 'menu' } = {}) {
@@ -112,7 +114,7 @@ export function renderSpellbook(game, { context = 'menu' } = {}) {
     <div class="sheet spellbook-sheet">
       <div class="sheet-head">
         <h2 class="ornate">THE SPELLBOOK</h2>
-        <p class="sheet-sub">Skulls earned across the campaign buy permanent enchantments. Every tier is +35% damage.</p>
+        <p class="sheet-sub">Skulls earned across the campaign buy permanent enchantments. Every tier is +${tierBonus(1)}% damage and tougher traps, on top of in-level upgrades.</p>
       </div>
       <div class="sb-purse">
         <span class="sk big">${SKULL}</span>

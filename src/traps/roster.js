@@ -105,7 +105,7 @@ function hitLane(game, trap, len, opts) {
       if (!opts.airborne && e.airborne) continue;
       seen.add(e);
       const dealt = trapDamage(game, trap, e, {
-        amount: opts.amount * power(trap), type: opts.type,
+        amount: opts.amount * power(trap) * (e.airborne ? (opts.airMult ?? 1) : 1), type: opts.type,
         source: { kind: 'trap', id: trap.def.id, trap }, position: w,
         statuses: opts.statuses,
         knockback: opts.knock ? { x: dv.x * opts.knock, y: opts.knockUp ?? 0, z: dv.z * opts.knock } : null,
@@ -204,7 +204,7 @@ export const TRAPS = [
     counters: [],
     blurb: 'No damage. Halves their speed, and the tar clings — anything you burn within a tile or two of it takes far more.',
     sense: { kind: 'tile', radius: TILE * 0.5 },
-    upgrade: { costs: [260, 420], notes: ['Thicker tar: slower, wider', 'Bitumen: slows even the unstoppable'] },
+    upgrade: { costs: [260, 420], notes: ['Wider pool', 'Bitumen: longer coating and an extra 30% slow'] },
     build() {
       const g = new THREE.Group();
       const rim = new THREE.Mesh(new THREE.TorusGeometry(TILE * 0.46, 0.16, 5, 22).rotateX(Math.PI / 2), M.darkStone);
@@ -277,7 +277,7 @@ export const TRAPS = [
       trap._acc = (trap._acc || 0) + dt;
       if (trap._acc < 0.15) return;
       trap._acc = 0;
-      // Level 3 bitumen is the only slow that sticks to unstoppable bosses.
+      // Level 3 bitumen adds a separate 30% slow on top of the tar and coats for longer.
       //
       // The lingering window is the whole combo system, and it was measurably too short.
       // A tarred orc moves at 0.45 speed, i.e. ~2.8s to cross one tile, so a 1.6s coating
@@ -304,7 +304,7 @@ export const TRAPS = [
     sense: { kind: 'lane', length: 5, radius: TILE * 0.66, air: true },
     group: { want: 2, patience: 0.45 },
     windup: 0.3,
-    upgrade: { costs: [400, 650], notes: ['Six bolts, longer lane', 'Bodkin heads: pierce armour'] },
+    upgrade: { costs: [400, 650], notes: ['Six bolts, longer lane', 'Bodkin heads: targets take +20% damage for 2.5s'] },
     build() {
       const g = new THREE.Group();
       // Everything hangs off the wall at local -Z; the lane runs toward local +Z.
@@ -481,10 +481,12 @@ export const TRAPS = [
   {
     id: 'ceiling-pounder', name: 'Ceiling Pounder', surface: 'ceiling',
     cost: 700, cooldown: 2.6, unlockLevel: 3,
-    tags: ['crush', 'anti-armour'],
-    counters: ['armored', 'shielded'],
-    blurb: 'A spiked block on a winch. Crush damage laughs at plate — and shatters anything frozen.',
-    sense: { kind: 'tile', radius: TILE * 0.55, plate: true },
+    tags: ['crush', 'anti-armour', 'anti-air'],
+    counters: ['armored', 'shielded', 'flying'],
+    blurb: 'A spiked block on a winch. Crush damage laughs at plate — and shatters anything frozen. Swats flyers on the way down.',
+    // `air`: the block falls from the ceiling straight through flying height, so a
+    // Gargoyle over the plate both trips it and gets hit.
+    sense: { kind: 'tile', radius: TILE * 0.55, plate: true, air: true },
     group: { want: 2, patience: 0.7 },
     windup: 0.34,
     upgrade: { costs: [560, 900], notes: ['Heavier block, faster winch', 'Iron maiden: spikes on all faces'] },
@@ -589,7 +591,7 @@ export const TRAPS = [
     deferTrigger: true,
     /** Called by the rig at the bottom of the swing — the damage belongs to the impact. */
     impact(trap, game) {
-      const v = hitCell(game, trap, { amount: 115, type: 'crush', radius: TILE * 0.68, knockUp: 2 });
+      const v = hitCell(game, trap, { amount: 115, type: 'crush', radius: TILE * 0.68, knockUp: 2, airborne: true });
       game.fx.dust(trap.world, 1.8, 22);
       game.fx.shake(0.45, 0.22);
       game.engine.hitstop(0.04);
@@ -825,11 +827,13 @@ export const TRAPS = [
       const victims = [];
       for (const e of game.enemies.queryRadius(trap.world, TILE * 0.6)) {
         if (e.airborne) continue;
-        // A level 3 catapult is heavy enough to throw what "unstoppable" normally protects.
-        if (e.has('unstoppable') && trap.level < 3) continue;
+        // A level 3 catapult is heavy enough to throw what "unstoppable" normally protects
+        // (never a boss; see combos.launch).
+        const catapult = trap.level >= 3;
+        if (e.has('unstoppable') && !catapult) continue;
         const heavy = e.mass > 3;
-        if (heavy && trap.level < 3) continue;
-        if (launch(game, trap, e, dv.x * throwPower, 11 + trap.level, dv.z * throwPower)) victims.push(e);
+        if (heavy && !catapult) continue;
+        if (launch(game, trap, e, dv.x * throwPower, 11 + trap.level, dv.z * throwPower, { force: catapult })) victims.push(e);
       }
       game.fx.dust(trap.world, 1.3, 14, [0.4, 0.9, 0.6]);
       return victims;
@@ -842,8 +846,8 @@ export const TRAPS = [
     cost: 800, cooldown: 1.25, unlockLevel: 4,
     tags: ['physical', 'sweep'],
     counters: ['shielded', 'trap-disarm'],
-    blurb: 'A spinning arc that sweeps two tiles. Shields block it — so hit them from behind.',
-    sense: { kind: 'lane', length: 1, radius: TILE * 0.62 },
+    blurb: 'A spinning arc that sweeps two tiles. Shields block it — so hit them from behind. Clips low flyers for half damage.',
+    sense: { kind: 'lane', length: 1, radius: TILE * 0.62, air: true },
     windup: 0.26,
     upgrade: { costs: [640, 1040], notes: ['Third blade, deeper reach', 'Serrated: sweeps twice per trigger'] },
     build() {
@@ -921,6 +925,7 @@ export const TRAPS = [
       const len = trap.level >= 2 ? 2 : 1;
       const v = hitLane(game, trap, len, {
         from: 0, amount: 72, type: 'physical', radius: TILE * 0.62, knock: 9, knockUp: 1.2,
+        airborne: true, airMult: 0.5,
       });
       for (const e of v) game.fx.blood(e.position, aimVec(trap), 1.1);
       // Serrated: a second bite half a beat later catches whoever stepped into the gap.
@@ -932,7 +937,7 @@ export const TRAPS = [
         trap._second -= dt;
         if (trap._second <= 0) {
           trap._second = 0;
-          hitLane(game, trap, 2, { from: 0, amount: 42, type: 'physical', radius: TILE * 0.62, knock: 6 });
+          hitLane(game, trap, 2, { from: 0, amount: 42, type: 'physical', radius: TILE * 0.62, knock: 6, airborne: true, airMult: 0.5 });
           game.fx.trapBlades(trap.world, trap);
         }
       }

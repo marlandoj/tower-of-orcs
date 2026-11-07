@@ -4,6 +4,7 @@ import { TILE, DIRS } from '../world/Grid.js';
 import { buildGuardian } from './guardianModel.js';
 import { BuildGhost, angleFor } from './ghost.js';
 import { trapDamage, updateFlights, clearFlights, resetComboTeaching } from './combos.js';
+import { clampTier, tierDamageMult, SPELLBOOK_HP_PER_TIER } from '../shared/progression.js';
 import { levelPips, disposeTrap, ringMesh, TrapLightPool } from './parts.js';
 import { status } from '../shared/Damage.js';
 import { v0, v1 } from '../shared/scratch.js';
@@ -38,7 +39,7 @@ const STATE_COLOR = {
 /** Structural HP. Guardians and barricades use their spec; everything else is equally sappable. */
 function hpFor(def, tier) {
   const base = def.guardian ? def.guardian.hp : def.barricade ? def.barricade.hp : 240;
-  const scale = def.barricade ? 0.65 : 0.4;
+  const scale = def.barricade ? 0.65 : SPELLBOOK_HP_PER_TIER;
   return Math.round(base * (1 + tier * scale));
 }
 
@@ -412,13 +413,14 @@ export class TrapManager {
     if (def.surface === 'wall' || def.surface === 'floor') obj.rotation.y = angleFor(def, dir);
     this.root.add(obj);
 
-    // Spellbook tiers bought between levels are the trap's *starting* level; in-level
-    // upgrades continue from there and still cap at 3. A player who has invested in
-    // Spike Floors places them already barbed.
-    const tier = Math.max(0, Math.min(2, g.save?.data?.spellbook?.[def.id] ?? 0));
+    // Spellbook tiers bought between levels are a permanent damage and toughness bonus on
+    // top of in-level upgrades (see shared/progression.js). Every trap still starts at
+    // level 1, so in-level upgrades keep their price and their meaning.
+    const tier = clampTier(g.save?.data?.spellbook?.[def.id] ?? 0);
 
     const trap = {
-      def, gx, gz, dir, level: 1 + tier, object: obj, rig: obj.userData.rig || null,
+      def, gx, gz, dir, level: 1, tier, tierMult: tierDamageMult(tier),
+      object: obj, rig: obj.userData.rig || null,
       lights: lights.length ? lights : null,
       world: new THREE.Vector3(v0.x, 0, v0.z),
       cooldownLeft: 0, kills: 0, enabled: true, destroyed: false,

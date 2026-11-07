@@ -95,7 +95,9 @@ export function trapDamage(game, trap, enemy, spec) {
 
   const dealt = applyDamage(enemy, {
     ...spec,
-    amount: spec.amount * Math.min(mult, 4),
+    // Spellbook tier is applied here, once, so every trap and guardian gets it whether
+    // it scales through power() or reads trap.level directly.
+    amount: spec.amount * Math.min(mult, 4) * (trap?.tierMult ?? 1),
     statuses: credit(statuses, spec.source),
   }, game);
 
@@ -178,8 +180,13 @@ export function resetComboTeaching() { _seen.clear(); }
  */
 const _flights = [];
 
-export function launch(game, trap, enemy, vx, vy, vz) {
-  if (enemy.has('unstoppable')) return false;
+/**
+ * `opts.force` lets a level-3 Spring Trap throw what `unstoppable` normally protects
+ * (Ogres, Trolls). Bosses are never thrown: a pit landing is an instant kill.
+ */
+export function launch(game, trap, enemy, vx, vy, vz, opts = {}) {
+  if (enemy.has('boss')) return false;
+  if (enemy.has('unstoppable') && !opts.force) return false;
   enemy.applyImpulse(vx, vy, vz);
   enemy.addStatus(status('launched', 1.4, 1), game);
   enemy.addStatus(status('stun', 0.55, 1), game);
@@ -205,7 +212,12 @@ export function updateFlights(game, dt) {
     if (f.e.dead) { _flights.splice(i, 1); continue; }
     if (f.t < f.life) continue;
     _flights.splice(i, 1);
-    if (f.intoPit) {
+    // The pit landing was predicted from an unobstructed arc. If a wall bounced the orc
+    // it is nowhere near that point, and must not die on safe floor. A pit rescue only
+    // nudges it to the nearest edge, so anything within a tile and a half really landed.
+    const ox = f.e.position.x - f.lx, oz = f.e.position.z - f.lz;
+    const landed = ox * ox + oz * oz < (TILE * 1.5) * (TILE * 1.5);
+    if (f.intoPit && landed) {
       v0.set(f.lx, 0, f.lz);
       applyDamage(f.e, {
         amount: 100000, type: 'physical',

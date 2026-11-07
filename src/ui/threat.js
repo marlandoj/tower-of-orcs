@@ -13,7 +13,7 @@
 export const FLAGS = {
   flying: {
     label: 'Flying', severity: 3,
-    counter: 'Floor traps miss entirely. Answer with walls, ceilings or an archer.',
+    counter: 'Floor traps miss entirely. Answer with arrow walls, pounders, blades, rods or an archer.',
   },
   armored: {
     label: 'Armoured', severity: 2,
@@ -25,7 +25,7 @@ export const FLAGS = {
   },
   'trap-disarm': {
     label: 'Sappers', severity: 3,
-    counter: 'Destroys the first floor trap it touches. Layer wall and ceiling traps behind it.',
+    counter: 'Chews through every floor trap it stands on. Layer wall and ceiling traps behind it.',
   },
   'fire-immune': {
     label: 'Fire-immune', severity: 2,
@@ -41,15 +41,15 @@ export const FLAGS = {
   },
   unstoppable: {
     label: 'Unstoppable', severity: 2,
-    counter: 'Immune to knockback — springs and blades will not move it. Raw damage only.',
+    counter: 'Immune to knockback and stun. Only a level 3 Spring Trap (Catapult) can throw it.',
   },
   healer: {
     label: 'Healers', severity: 3,
     counter: 'Heals the whole pack. Make it die first: burst the chokepoint.',
   },
   buffer: {
-    label: 'Warchanter', severity: 2,
-    counter: 'Hastes everything around it. Kill it before the wave speeds up.',
+    label: 'Support', severity: 2,
+    counter: 'Strengthens the pack around it — heals, shields or haste. Kill it first.',
   },
   ranged: {
     label: 'Ranged', severity: 2,
@@ -138,7 +138,7 @@ const ANSWERS = [
 const WEAKNESSES = [
   ['fire', 'Wasted on fire-immune orcs'],
   ['ice', 'Wasted on frost-immune orcs'],
-  ['physical', 'Halved by armour'],
+  ['physical', 'Blunted by armour'],
 ];
 
 export function trapAnswers(def) {
