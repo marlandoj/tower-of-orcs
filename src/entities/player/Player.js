@@ -219,7 +219,9 @@ export class Player {
   // --- frame ----------------------------------------------------------------
   update(dt) {
     const g = this.game;
-    if (g.state === 'menu') return;
+    // Results screens and the title freeze the hero along with everything else; only a
+    // live run (or a pause, below) gets this far.
+    if (!g.simulating && g.state !== 'paused') return;
 
     // Projectiles tick before anything can consume them, and keep ticking while the
     // player is dead — a fireball already in the air still has to land.

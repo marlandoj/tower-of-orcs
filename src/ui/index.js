@@ -336,7 +336,7 @@ export class UI {
       case 'back': this._back(); break;
       case 'resume': g.resume(); this.hideAll(); break;
       case 'restart': this.hideAll(); this.showHUD(); g.restartLevel(); break;
-      case 'quit': this.showTitle(); g.state = 'menu'; break;
+      case 'quit': g.returnToMenu(); break;
       case 'next': this.hideAll(); this.showHUD(); g.nextLevel(); break;
       case 'retry': this.hideAll(); this.showHUD(); g.restartLevel(); break;
       case 'level': this.hideAll(); this.showHUD(); g.loadLevel(Number(b.dataset.index)); break;

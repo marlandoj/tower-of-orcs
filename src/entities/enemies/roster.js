@@ -486,6 +486,7 @@ export const ROSTER = [
     resist: { physical: 0.85 },
     damageToRift: 2, coin: 90, score: 450,
     attackDamage: 26, attackRate: 1.5, attackRange: 1.5, attackAnim: 0.5,
+    ambushMult: 2.5,   // the opening strike from stealth; see Enemy._tryAttack
     // The only unit in the roster that crosses a room to find you. Twenty metres of
     // notice, a twelve-second commitment, and a leash long enough that walking away is
     // not an answer — you have to turn round and kill it.
@@ -504,11 +505,8 @@ export const ROSTER = [
        * stalk is the tell you get, and it is the only one.
        */
       update(e, game, dt) {
-        if (e.stealthed && e.pendingHit > 0) {
-          e.attackDamage = e.def.attackDamage * 2.5;
-        } else if (!e.stealthed) {
-          e.attackDamage = e.def.attackDamage;
-        }
+        // The 2.5x opening strike is `ambushMult`, applied in Enemy._tryAttack at the
+        // moment the swing is committed (while still stealthed).
         // Faster while unseen and committed; ordinary once it has shown itself.
         e.speedMul = e.stealthed && e.hunt > 0 ? 1.3 : 1;
         return false;

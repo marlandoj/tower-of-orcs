@@ -125,7 +125,9 @@ export const SPELLS = [
       const RANGE = 32, HALF_WIDTH = 1.5;
 
       let n = 0;
-      for (const e of game.enemies.list) {
+      // Snapshot: a kill swap-removes from the live list, which would skip the enemy moved
+      // into the dead one's slot.
+      for (const e of Array.from(game.enemies.list)) {
         if (e.dead) continue;
         const ex = e.position.x - origin.x, ez = e.position.z - origin.z;
         const t = ex * dx + ez * dz;

@@ -102,6 +102,21 @@ export class Game {
     else this.ui.showCampaignComplete();
   }
 
+  /**
+   * True while the run is live. Simulation systems (enemies, traps, player, director)
+   * whitelist these two states rather than blacklisting the others, so a new state such
+   * as a results screen can never accidentally leave combat running behind it.
+   */
+  get simulating() { return this.state === 'build' || this.state === 'wave'; }
+
+  /** Abandon the current run and go back to the title. */
+  returnToMenu() {
+    this.state = 'menu';
+    if (this.traps.buildMode) this.traps.toggleBuild(false);
+    this.enemies.clear();
+    this.ui.showTitle();
+  }
+
   pause() { if (this.state === 'wave' || this.state === 'build') { this._prev = this.state; this.state = 'paused'; } }
   resume() { if (this.state === 'paused') this.state = this._prev || 'build'; }
 }

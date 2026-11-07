@@ -130,7 +130,7 @@ export class TrapManager {
   // --- per-frame -----------------------------------------------------------
   update(dt) {
     const g = this.game;
-    if (g.state === 'paused' || g.state === 'menu') return;
+    if (!g.simulating) return;
 
     updateFlights(g, dt);
     g.camera.getWorldQuaternion(this._camQ);
@@ -153,7 +153,8 @@ export class TrapManager {
     if (t.frozen > 0) {
       t.frozen -= dt;
       this._setRing(t, 'frozen', 1);
-      t.rig?.tick?.(dt, t, g);
+      // No rig tick: some rigs carry gameplay (the Pounder lands its impact from its rig),
+      // and a frozen trap must not deal damage. It resumes where it stopped on thaw.
       return;
     }
 
@@ -755,9 +756,10 @@ export class TrapManager {
     st.cd = Math.max(-0.2, st.cd - dt);
     st.repos -= dt;
 
-    // Guardians are units, not furniture: the horde fights back.
-    this._guardianIncoming(t, dt);
-    if (t.hp <= 0) { this._guardianDeath(t); return; }
+    // Guardians are units, not furniture: the horde fights back. That damage is real now —
+    // melee orcs pick guardians as targets (Enemy._pickTarget) and archers shoot them
+    // (EnemyManager arrows) — and lands through damageGuardian(). The old proximity-DPS
+    // model on top of that counted every blow twice and hit through walls.
 
     // Blockers physically hold their tile. Everything else keeps its distance.
     st.blocking = spec.blocker ? this._block(t, spec) : false;
@@ -872,35 +874,6 @@ export class TrapManager {
     return blocking;
   }
 
-  /**
-   * Incoming damage. Enemies only ever target the player directly, so the pressure a
-   * guardian is under is modelled here: anything in melee range is hitting it, and
-   * ranged orcs shoot it from the back of the pack — the documented counter to hired help.
-   */
-  _guardianIncoming(t, dt) {
-    const g = this.game;
-    const spec = t.def.guardian;
-    let dps = 0;
-    const melee = 2.4 + (spec.blockRadius ?? 0);
-    for (const e of g.enemies.queryNear(t.world, melee)) {
-      if (e.dead || e.airborne) continue;
-      dps += (e.attackDamage ?? 10) / Math.max(0.4, e.attackRate ?? 1.2);
-    }
-    for (const e of g.enemies.queryNear(t.world, 14)) {
-      if (e.dead || !e.has('ranged')) continue;
-      dps += (e.attackDamage ?? 12) / Math.max(0.5, e.attackRate ?? 2) * 0.9;
-    }
-    if (dps <= 0) return;
-
-    t.hp -= dps * dt;
-    t.gs.hurtAcc += dps * dt;
-    if (t.gs.hurtAcc > t.hpMax * 0.04) {
-      t.gs.hurtAcc = 0;
-      t.rig?.hurt?.();
-      g.fx.hit(v0.set(t.world.x, 1.3, t.world.z), null, { count: 4, color: [1, 0.4, 0.35], speed: 4 });
-    }
-  }
-
   _guardianDeath(t) {
     const g = this.game;
     g.fx.gib(t.world, null, 10, [0.5, 0.2, 0.18]);
@@ -937,7 +910,9 @@ export class TrapManager {
   }
 
   damageGuardian(trap, amount) {
-    if (!trap?.def.guardian) return;
+    // A second pending blow can land on a guardian the first one already felled (or that
+    // was sold mid-swing). Death must run exactly once.
+    if (!trap?.def.guardian || trap.destroyed) return;
     trap.hp -= amount;
     trap.rig?.hurt?.();
     if (trap.hp <= 0) this._guardianDeath(trap);

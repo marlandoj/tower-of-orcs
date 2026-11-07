@@ -408,7 +408,9 @@ export class WaveDirector {
     if (this.streams.length > 0 || this.phase === 'telegraph') { this._resetStall(); return; }
 
     this._stallProbe -= dt;
-    if (this._stallProbe > 0) { this._stallT += dt; return; }
+    // Time is credited once per probe (below), not per frame as well — doing both ran the
+    // stall clock at about twice real time, so the 20 s nudge fired at ~10 s.
+    if (this._stallProbe > 0) return;
     this._stallProbe = 1.0;
 
     const items = g.enemies.list.items;

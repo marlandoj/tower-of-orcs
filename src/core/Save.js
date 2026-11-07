@@ -7,7 +7,7 @@ export class Save {
   _load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return { ...defaults(), ...JSON.parse(raw) };
+      if (raw) return normalizeSave(JSON.parse(raw));
     } catch {}
     return defaults();
   }
@@ -33,6 +33,73 @@ export class Save {
   setSetting(k, v) { this.data.settings[k] = v; this.flush(); }
 
   reset() { this.data = defaults(); this.flush(); }
+}
+
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const num = (v, fallback, min = -Infinity, max = Infinity) =>
+  (typeof v === 'number' && Number.isFinite(v)) ? Math.min(max, Math.max(min, v)) : fallback;
+
+/**
+ * Coerce whatever came out of localStorage into a well-formed save.
+ *
+ * A shallow `{ ...defaults(), ...parsed }` let syntactically valid but malformed data
+ * through — `{"best":null}` made level select throw, a partial `player` record leaked NaN
+ * into skill points. Every field is checked and anything unusable falls back to its
+ * default, so a damaged save degrades to a partial reset instead of a broken game.
+ */
+export function normalizeSave(raw) {
+  const d = defaults();
+  if (!isObj(raw)) return d;
+
+  d.unlockedLevel = Math.floor(num(raw.unlockedLevel, 0, 0, 999));
+  d.seenTutorial = raw.seenTutorial === true;
+
+  if (isObj(raw.best)) {
+    for (const [k, r] of Object.entries(raw.best)) {
+      if (!isObj(r)) continue;
+      d.best[k] = { score: num(r.score, 0, 0), skulls: Math.floor(num(r.skulls, 0, 0, 5)) };
+    }
+  }
+  d.totalSkulls = Object.values(d.best).reduce((s, r) => s + r.skulls, 0);
+
+  if (isObj(raw.spellbook)) {
+    for (const [k, t] of Object.entries(raw.spellbook)) {
+      const tier = num(t, null, 0, 9);
+      if (tier !== null) d.spellbook[k] = Math.floor(tier);
+    }
+  }
+
+  if (isObj(raw.settings)) {
+    for (const [k, def] of Object.entries(d.settings)) {
+      const v = raw.settings[k];
+      if (typeof def === 'number') d.settings[k] = num(v, def, 0, 4);
+      else if (typeof def === 'boolean' && typeof v === 'boolean') d.settings[k] = v;
+    }
+    // Settings added later (keybinds etc.) that this version does not know about are
+    // carried through untouched rather than silently dropped.
+    for (const [k, v] of Object.entries(raw.settings)) if (!(k in d.settings)) d.settings[k] = v;
+  }
+
+  if (isObj(raw.player)) {
+    const p = raw.player;
+    const ranks = {};
+    if (isObj(p.ranks)) {
+      for (const [k, v] of Object.entries(p.ranks)) {
+        const r = num(v, null, 0, 99);
+        if (r !== null) ranks[k] = Math.floor(r);
+      }
+    }
+    d.player = {
+      points: Math.floor(num(p.points, 0, 0)),
+      spent: Math.floor(num(p.spent, 0, 0)),
+      ranks,
+      claimed: Array.isArray(p.claimed) ? p.claimed.filter((c) => typeof c === 'string') : [],
+    };
+  }
+
+  // Unknown top-level keys from newer builds survive a round trip.
+  for (const [k, v] of Object.entries(raw)) if (!(k in d)) d[k] = v;
+  return d;
 }
 
 function defaults() {

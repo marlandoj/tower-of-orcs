@@ -269,7 +269,7 @@ export class EnemyManager {
   }
 
   update(dt) {
-    if (this.game.state === 'paused') return;
+    if (!this.game.simulating) return;
     this._rebuildHash();
     this._cull();
     const items = this.list.items;

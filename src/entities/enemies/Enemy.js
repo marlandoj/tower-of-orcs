@@ -56,6 +56,7 @@ export class Enemy {
     this.flagSet = def._flagSet;
     this.damageToRift = def.damageToRift ?? 1;
     this.attackDamage = def.attackDamage ?? 10;
+    this._baseAttack = this.attackDamage;
     this.attackRate = def.attackRate ?? 1.1;
     this.attackRange = def.attackRange ?? 1.6;
     this.attackAnim = def.attackAnim ?? 0.72;
@@ -81,6 +82,15 @@ export class Enemy {
     this._alt = false;
     this._cycle = -1;
     this._shieldBroken = false;
+    // Transient state owned by archetype abilities (abilities.js / roster.js). Enemies are
+    // pooled, so anything an ability leaves behind would otherwise carry into the next
+    // life: an Ogre killed mid-windup used to resume that old slam on respawn. Reset to
+    // `undefined`, which is exactly what a never-used enemy starts with.
+    this.slamT = this.slamWind = this.slamR = this.slamDamage = this.slamWreck = this.slamMark = undefined;
+    this.chargeT = this.chargeDX = this.chargeDZ = this.chargeHit = undefined;
+    this.leapPounce = this.leapVX = this.leapVY = this.leapVZ = undefined;
+    this.siegeCd = this.siegeCheck = this.siegeHit = this.siegeTarget = undefined;
+    this._chew = undefined;
     this.statuses.length = 0;
     recomputeStatusMods(this);
 
@@ -265,6 +275,21 @@ export class Enemy {
       this.rig?.setStealth?.(true);
     }
 
+    // Hard crowd control comes first. A stunned or frozen orc does not finish the swing it
+    // was winding up, does not get to run its archetype AI (the archer would still shoot,
+    // the sapper would still chew, the leaper would still steer itself), and does not
+    // start a new attack. It only drifts to a stop.
+    if (mods.stunned || mods.rooted) {
+      if (this.pendingHit >= 0) { this.pendingHit = -1; this.attackTarget = null; }
+      if (this.slamT > 0) this.slamT = 0;   // a slam wind-up is interrupted, not paused
+      if (this.state === 'attack') this.state = 'walk';
+      this._threat(dt, game);
+      this.velocity.multiplyScalar(Math.pow(0.001, dt));
+      this._integrate(dt, game);
+      this._render(dt, game);
+      return;
+    }
+
     // A landed blow resolves mid-animation, not on a timer: hitstop and slow-mo have to
     // stretch the wind-up too or the tell stops matching the hit.
     if (this.pendingHit >= 0) {
@@ -281,13 +306,6 @@ export class Enemy {
 
     // Custom AI gets first refusal; if it returns true it fully handled this frame.
     if (this.def.ai?.update?.(this, game, dt)) { this._render(dt, game); return; }
-
-    if (mods.stunned || mods.rooted) {
-      this.velocity.multiplyScalar(Math.pow(0.001, dt));
-      this._integrate(dt, game);
-      this._render(dt, game);
-      return;
-    }
 
     this._steer(dt, game);
     this._integrate(dt, game);
@@ -511,7 +529,10 @@ export class Enemy {
     const rift = game.grid.rifts[0];
     if (rift) {
       const rc = game.grid.toWorld(rift.gx, rift.gz, v0);
-      if (this.position.distanceToSquared(rc) < 9) this._leak(game);
+      // Measured in the ground plane: a 3D sphere at floor height excluded every flyer
+      // cruising above 3 m, so Gargoyles hovered over the rift and could never leak.
+      const dx = this.position.x - rc.x, dz = this.position.z - rc.z;
+      if (dx * dx + dz * dz < 9) this._leak(game);
     }
   }
 
@@ -582,9 +603,18 @@ export class Enemy {
    * has been stuck behind a guardian for half a second will turn on it, which is what
    * stops a blocked wave from jittering against a wall of paladins forever.
    */
+  /**
+   * How far this orc's *melee* swing reaches. Ranged archetypes carry their shooting range
+   * in `attackRange`; reusing that for the generic swing gave archers an invisible 16 m
+   * melee hit that ignored walls. They get a short knife-reach instead.
+   */
+  get meleeRange() {
+    return this.def.meleeRange ?? (this.has('ranged') ? 1.4 : this.attackRange);
+  }
+
   _pickTarget(game) {
     const p = game.player;
-    const reach = this.attackRange + this.radius + 0.5;
+    const reach = this.meleeRange + this.radius + 0.5;
     if (p && !p.dead && this.position.distanceToSquared(p.position) < reach * reach) return p;
     // A guardian standing in the horde's path gets hit. Without this a wall of paladins is
     // a free win: the orcs would just jitter against it forever.
@@ -608,6 +638,11 @@ export class Enemy {
     this.attackTarget = target;
     // The hit lands 40% into the swing — after the wind-up, on the way through.
     this.pendingHit = this.attackAnim * 0.42;
+    // An archetype's opening-strike bonus has to be locked in *before* the reveal below,
+    // or it can never see the stealthed state it depends on.
+    this.attackDamage = (this.def.ambushMult && this.stealthed)
+      ? this._baseAttack * this.def.ambushMult
+      : this._baseAttack;
     if (this.stealthed) this.reveal();
     // Square up to what we are about to hit; a swing at nothing reads as a bug.
     const tp = target.position || target.world;
@@ -621,9 +656,10 @@ export class Enemy {
     if (!t || this.dead) return;
     const dmg = this.attackDamage * (this.statusMods.damageDealt ?? 1);
     const tp = t.position || t.world;
-    const reach = this.attackRange + this.radius + 1.1;
+    const reach = this.meleeRange + this.radius + 1.1;
     if (tp.distanceToSquared(this.position) > reach * reach) return;   // it moved: whiff
     if (t.def?.guardian) {
+      if (t.destroyed) return;   // another orc's blow already felled it
       game.traps.damageGuardian(t, dmg);
       game.fx.hit(tp, null, { count: 6, color: [1, 0.8, 0.5], speed: 5 });
       game.audio.play('hit.armor', { position: tp, pitch: 0.9 });
